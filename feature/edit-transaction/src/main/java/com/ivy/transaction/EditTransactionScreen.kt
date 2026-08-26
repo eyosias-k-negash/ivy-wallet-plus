@@ -1,5 +1,8 @@
 package com.ivy.transaction
 
+import android.app.Activity
+import android.content.Intent
+import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -54,7 +57,6 @@ import com.ivy.legacy.ui.component.tags.ShowTagModal
 import com.ivy.legacy.utils.onScreenStart
 import com.ivy.navigation.EditPlannedScreen
 import com.ivy.navigation.EditTransactionScreen
-import com.ivy.navigation.IvyPreview
 import com.ivy.navigation.navigation
 import com.ivy.navigation.screenScopedViewModel
 import com.ivy.ui.R
@@ -203,6 +205,9 @@ fun BoxWithConstraintsScope.EditTransactionScreen(screen: EditTransactionScreen)
         onRemoveAttachment = {
             viewModel.onEvent(EditTransactionViewEvent.OnRemoveAttachment)
         },
+        onAttachAudio = {
+            viewModel.onEvent(EditTransactionViewEvent.OnAttachAudio(it))
+        },
         attachmentUrl = uiState.attachmentUrl,
         cameraTempUri = viewModel.cameraTempUri
     )
@@ -256,6 +261,7 @@ private fun BoxWithConstraintsScope.UI(
     onImageCaptured: (Boolean) -> Unit = {},
     onViewAttachment: () -> Unit = {},
     onRemoveAttachment: () -> Unit = {},
+    onAttachAudio: (android.net.Uri) -> Unit = {},
     attachmentUrl: String? = null,
     cameraTempUri: android.net.Uri? = null,
     loanData: EditTransactionDisplayLoan = EditTransactionDisplayLoan(),
@@ -286,6 +292,16 @@ private fun BoxWithConstraintsScope.UI(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
         onImageCaptured(success)
+    }
+
+    val recordAudioLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            result.data?.data?.let { uri ->
+                onAttachAudio(uri)
+            }
+        }
     }
 
     val waitModalVisible by remember(backgroundProcessing) {
@@ -429,9 +445,12 @@ private fun BoxWithConstraintsScope.UI(
                 onClick = { showAttachmentOptions = true }
             )
         } else {
+            val isAudio = attachmentUrl.endsWith(".m4a", ignoreCase = true) || 
+                          attachmentUrl.endsWith(".mp3", ignoreCase = true)
+            
             AddPrimaryAttributeButton(
-                icon = R.drawable.ic_attachment,
-                text = stringResource(R.string.image_attached),
+                icon = if (isAudio) R.drawable.ic_vue_media_microphone else R.drawable.ic_attachment,
+                text = stringResource(if (isAudio) R.string.audio_note_attached else R.string.image_attached),
                 onClick = onViewAttachment,
                 onLongClick = { showRemoveAttachmentConfirm = true }
             )
@@ -718,7 +737,7 @@ private fun BoxWithConstraintsScope.UI(
             )
 
             AddPrimaryAttributeButton(
-                icon = R.drawable.ic_attachment,
+                icon = R.drawable.ic_vue_media_photocamera,
                 text = stringResource(R.string.take_photo),
                 onClick = {
                     onRequestCaptureImage()
@@ -730,7 +749,19 @@ private fun BoxWithConstraintsScope.UI(
             Spacer(Modifier.height(12.dp))
 
             AddPrimaryAttributeButton(
-                icon = R.drawable.ic_attachment,
+                icon = R.drawable.ic_vue_media_microphone,
+                text = stringResource(R.string.audio_note),
+                onClick = {
+                    val intent = Intent(MediaStore.Audio.Media.RECORD_SOUND_ACTION)
+                    recordAudioLauncher.launch(intent)
+                    showAttachmentOptions = false
+                }
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            AddPrimaryAttributeButton(
+                icon = R.drawable.ic_vue_media_image,
                 text = stringResource(R.string.choose_from_gallery),
                 onClick = {
                     pickImageLauncher.launch(
@@ -775,8 +806,9 @@ private val testDateTime = LocalDateTime.of(2023, 4, 27, 0, 35)
 @ExperimentalFoundationApi
 @Preview
 @Composable
-private fun BoxWithConstraintsScope.Preview(isDark: Boolean = false) {
-    IvyPreview(isDark) {
+private fun Preview(isDark: Boolean = false) {
+    val theme = if (isDark) Theme.DARK else Theme.LIGHT
+    IvyWalletPreview(theme) {
         UI(
             screen = EditTransactionScreen(null, TransactionType.EXPENSE),
             initialTitle = "",

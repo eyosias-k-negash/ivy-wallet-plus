@@ -64,6 +64,7 @@ sealed interface EditTransactionViewEvent {
     data class UpdateExchangeRate(val exRate: Double?) : EditTransactionViewEvent
 
     data class OnAttachImage(val uri: Uri) : EditTransactionViewEvent
+    data class OnAttachAudio(val uri: Uri) : EditTransactionViewEvent
     data object OnRequestCaptureImage : EditTransactionViewEvent
     data class OnImageCaptured(val success: Boolean) : EditTransactionViewEvent
     data object OnViewAttachment : EditTransactionViewEvent

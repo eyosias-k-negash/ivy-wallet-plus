@@ -347,6 +347,7 @@ class EditTransactionViewModel @Inject constructor(
             is EditTransactionViewEvent.UpdateExchangeRate -> updateExchangeRate(event.exRate)
             is EditTransactionViewEvent.TagEvent -> handleTagEvent(event)
             is EditTransactionViewEvent.OnAttachImage -> onAttachImage(event.uri)
+            is EditTransactionViewEvent.OnAttachAudio -> onAttachAudio(event.uri)
             EditTransactionViewEvent.OnRequestCaptureImage -> onRequestCaptureImage()
             is EditTransactionViewEvent.OnImageCaptured -> onImageCaptured(event.success)
             EditTransactionViewEvent.OnViewAttachment -> onViewAttachment()
@@ -1016,7 +1017,13 @@ class EditTransactionViewModel @Inject constructor(
 
     private fun onAttachImage(uri: Uri) {
         viewModelScope.launch(Dispatchers.IO) {
-            saveAttachment(uri)
+            saveAttachment(uri, "jpg")
+        }
+    }
+
+    private fun onAttachAudio(uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            saveAttachment(uri, "m4a")
         }
     }
 
@@ -1052,8 +1059,14 @@ class EditTransactionViewModel @Inject constructor(
             file
         )
 
+        val mimeType = if (url.endsWith(".m4a", ignoreCase = true) || url.endsWith(".mp3", ignoreCase = true)) {
+            "audio/*"
+        } else {
+            "image/*"
+        }
+
         val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "image/*")
+            setDataAndType(uri, mimeType)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
@@ -1061,11 +1074,17 @@ class EditTransactionViewModel @Inject constructor(
     }
 
     private fun onRemoveAttachment() {
+        attachmentUrl?.let { url ->
+            val file = File(url)
+            if (file.exists()) {
+                file.delete()
+            }
+        }
         attachmentUrl = null
         saveIfEditMode()
     }
 
-    private suspend fun saveAttachment(uri: Uri) {
+    private suspend fun saveAttachment(uri: Uri, extension: String) {
         try {
             val inputStream = context.contentResolver.openInputStream(uri) ?: return
             val attachmentsDir = File(context.filesDir, "attachments")
@@ -1073,7 +1092,15 @@ class EditTransactionViewModel @Inject constructor(
                 attachmentsDir.mkdirs()
             }
 
-            val fileName = "attach_${UUID.randomUUID()}.jpg"
+            // Remove previous attachment file if exists
+            attachmentUrl?.let { url ->
+                val oldFile = File(url)
+                if (oldFile.exists()) {
+                    oldFile.delete()
+                }
+            }
+
+            val fileName = "attach_${UUID.randomUUID()}.$extension"
             val file = File(attachmentsDir, fileName)
 
             FileOutputStream(file).use { outputStream ->

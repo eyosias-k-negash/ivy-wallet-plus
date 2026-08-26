@@ -501,4 +501,6 @@
     <string name="take_photo">Take photo</string>
     <string name="choose_from_gallery">Choose from gallery</string>
     <string name="remove_attachment">Remove attachment</string>
+    <string name="audio_note">Audio note</string>
+    <string name="audio_note_attached">Audio note attached</string>
 </resources>
