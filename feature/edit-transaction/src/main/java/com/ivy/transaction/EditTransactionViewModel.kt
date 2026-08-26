@@ -2,6 +2,8 @@ package com.ivy.transaction
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -71,9 +73,12 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDateTime
+import java.io.File
+import java.io.FileOutputStream
 import java.util.UUID
 import javax.inject.Inject
 
@@ -134,6 +139,9 @@ class EditTransactionViewModel @Inject constructor(
     private var backgroundProcessingStarted by mutableStateOf(false)
 
     private var customExchangeRateState by mutableStateOf(CustomExchangeRateState())
+    private var attachmentUrl by mutableStateOf<String?>(null)
+    var cameraTempUri by mutableStateOf<Uri?>(null)
+        private set
 
     private var loadedTransaction: Transaction? = null
     private var editMode = false
@@ -207,7 +215,8 @@ class EditTransactionViewModel @Inject constructor(
             backgroundProcessingStarted = getBackgroundProcessingStarted(),
             customExchangeRateState = getCustomExchangeRateState(),
             tags = getTags(),
-            transactionAssociatedTags = getTransactionAssociatedTags()
+            transactionAssociatedTags = getTransactionAssociatedTags(),
+            attachmentUrl = attachmentUrl
         )
     }
 
@@ -337,6 +346,11 @@ class EditTransactionViewModel @Inject constructor(
             is EditTransactionViewEvent.SetHasChanges -> setHasChanges(event.hasChangesValue)
             is EditTransactionViewEvent.UpdateExchangeRate -> updateExchangeRate(event.exRate)
             is EditTransactionViewEvent.TagEvent -> handleTagEvent(event)
+            is EditTransactionViewEvent.OnAttachImage -> onAttachImage(event.uri)
+            EditTransactionViewEvent.OnRequestCaptureImage -> onRequestCaptureImage()
+            is EditTransactionViewEvent.OnImageCaptured -> onImageCaptured(event.success)
+            EditTransactionViewEvent.OnViewAttachment -> onViewAttachment()
+            EditTransactionViewEvent.OnRemoveAttachment -> onRemoveAttachment()
         }
     }
 
@@ -390,6 +404,7 @@ class EditTransactionViewModel @Inject constructor(
         toAccount = transaction.toAccountId?.let {
             accountByIdAct(it)
         }
+        attachmentUrl = transaction.attachmentUrl
         category = transaction.categoryId?.let {
             categoryRepository.findById(CategoryId(it))
         }
@@ -728,6 +743,7 @@ class EditTransactionViewModel @Inject constructor(
                         else -> loadedTransaction().dateTime
                     },
                     categoryId = category?.id?.value,
+                    attachmentUrl = attachmentUrl,
                     isSynced = false
                 )
 
@@ -996,5 +1012,81 @@ class EditTransactionViewModel @Inject constructor(
 
     private suspend fun shouldSortCategoriesAscending(): Boolean {
         return features.sortCategoriesAscending.isEnabled(context)
+    }
+
+    private fun onAttachImage(uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            saveAttachment(uri)
+        }
+    }
+
+    private fun onRequestCaptureImage() {
+        val tempFile = File(context.cacheDir, "camera_temp/temp_image.jpg")
+        tempFile.parentFile?.mkdirs()
+        cameraTempUri = androidx.core.content.FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            tempFile
+        )
+    }
+
+    private fun onImageCaptured(success: Boolean) {
+        if (success) {
+            cameraTempUri?.let { onAttachImage(it) }
+        }
+    }
+
+    private fun onViewAttachment() {
+        val url = attachmentUrl ?: return
+        val file = File(url)
+        if (!file.exists()) {
+            viewModelScope.launch {
+                toaster.show(R.string.msg_file_not_found)
+            }
+            return
+        }
+
+        val uri = androidx.core.content.FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            file
+        )
+
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "image/*")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
+    }
+
+    private fun onRemoveAttachment() {
+        attachmentUrl = null
+        saveIfEditMode()
+    }
+
+    private suspend fun saveAttachment(uri: Uri) {
+        try {
+            val inputStream = context.contentResolver.openInputStream(uri) ?: return
+            val attachmentsDir = File(context.filesDir, "attachments")
+            if (!attachmentsDir.exists()) {
+                attachmentsDir.mkdirs()
+            }
+
+            val fileName = "attach_${UUID.randomUUID()}.jpg"
+            val file = File(attachmentsDir, fileName)
+
+            FileOutputStream(file).use { outputStream ->
+                inputStream.copyTo(outputStream)
+            }
+            inputStream.close()
+
+            attachmentUrl = file.absolutePath
+            withContext(Dispatchers.Main) {
+                saveIfEditMode()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 }

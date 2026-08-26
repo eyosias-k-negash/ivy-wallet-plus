@@ -37,7 +37,8 @@ class TransactionMapper @Inject constructor(
             recurringRuleId = recurringRuleId,
             paidForDateTime = paidForDateTime,
             loanId = loanId,
-            loanRecordId = loanRecordId
+            loanRecordId = loanRecordId,
+            attachmentUrl = attachmentUrl
         )
 
         val settled = dateTime != null
@@ -158,7 +159,7 @@ class TransactionMapper @Inject constructor(
             dueDate = time.takeIf { !settled },
             paidForDateTime = metadata.paidForDateTime,
             recurringRuleId = metadata.recurringRuleId,
-            attachmentUrl = null,
+            attachmentUrl = metadata.attachmentUrl,
             loanId = metadata.loanId,
             loanRecordId = metadata.loanRecordId,
             isSynced = true,

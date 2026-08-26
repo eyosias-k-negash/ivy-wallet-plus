@@ -10,6 +10,7 @@ import com.ivy.legacy.datamodel.Account
 import com.ivy.wallet.domain.data.CustomExchangeRateState
 import com.ivy.wallet.domain.deprecated.logic.model.CreateAccountData
 import com.ivy.wallet.domain.deprecated.logic.model.CreateCategoryData
+import android.net.Uri
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.ImmutableSet
 import java.time.Instant
@@ -35,7 +36,8 @@ data class EditTransactionViewState(
     val backgroundProcessingStarted: Boolean,
     val customExchangeRateState: CustomExchangeRateState,
     val tags: ImmutableList<Tag>,
-    val transactionAssociatedTags: ImmutableList<TagId>
+    val transactionAssociatedTags: ImmutableList<TagId>,
+    val attachmentUrl: String?
 )
 
 sealed interface EditTransactionViewEvent {
@@ -60,6 +62,12 @@ sealed interface EditTransactionViewEvent {
     data class Save(val closeScreen: Boolean) : EditTransactionViewEvent
     data class SetHasChanges(val hasChangesValue: Boolean) : EditTransactionViewEvent
     data class UpdateExchangeRate(val exRate: Double?) : EditTransactionViewEvent
+
+    data class OnAttachImage(val uri: Uri) : EditTransactionViewEvent
+    data object OnRequestCaptureImage : EditTransactionViewEvent
+    data class OnImageCaptured(val success: Boolean) : EditTransactionViewEvent
+    data object OnViewAttachment : EditTransactionViewEvent
+    data object OnRemoveAttachment : EditTransactionViewEvent
 
     sealed interface TagEvent : EditTransactionViewEvent {
         data class SaveTag(val name: String) : TagEvent

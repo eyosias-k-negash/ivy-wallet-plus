@@ -495,4 +495,10 @@
     <string name="bill_paid">Your bill for %1$s %2$s has been paid</string>
     <string name="language">Language</string>
     <string name="advanced_features">Advanced features</string>
+    <string name="msg_file_not_found">File not found</string>
+    <string name="image_attached">Image attached</string>
+    <string name="add_attachment">Add attachment</string>
+    <string name="take_photo">Take photo</string>
+    <string name="choose_from_gallery">Choose from gallery</string>
+    <string name="remove_attachment">Remove attachment</string>
 </resources>
