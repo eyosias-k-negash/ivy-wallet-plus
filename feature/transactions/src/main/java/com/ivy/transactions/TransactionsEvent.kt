@@ -6,8 +6,10 @@ import com.ivy.legacy.data.model.TimePeriod
 import com.ivy.legacy.datamodel.Account
 import com.ivy.navigation.TransactionsScreen
 import com.ivy.wallet.ui.theme.modal.ChoosePeriodModalData
+import java.time.LocalDate
 
 sealed interface TransactionsEvent {
+    data class ToggleBalanceMode(val date: LocalDate) : TransactionsEvent
     data class SetUpcomingExpanded(val expanded: Boolean) : TransactionsEvent
     data class SetOverdueExpanded(val expanded: Boolean) : TransactionsEvent
 
