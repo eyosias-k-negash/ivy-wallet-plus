@@ -15,6 +15,7 @@ dependencies {
     implementation(projects.temp.legacyCode)
     implementation(projects.temp.oldDesign)
     implementation(projects.widget.balance)
+    implementation(libs.play.services.location)
 
     testImplementation(projects.shared.ui.testing)
 }

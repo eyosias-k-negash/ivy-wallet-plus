@@ -3,6 +3,7 @@ package com.ivy.transaction
 import androidx.compose.runtime.Immutable
 import com.ivy.base.model.TransactionType
 import com.ivy.data.model.Category
+import com.ivy.data.model.Location
 import com.ivy.data.model.Tag
 import com.ivy.data.model.TagId
 import com.ivy.legacy.data.EditTransactionDisplayLoan
@@ -37,7 +38,8 @@ data class EditTransactionViewState(
     val customExchangeRateState: CustomExchangeRateState,
     val tags: ImmutableList<Tag>,
     val transactionAssociatedTags: ImmutableList<TagId>,
-    val attachmentUrl: String?
+    val attachmentUrl: String?,
+    val location: Location? = null
 )
 
 sealed interface EditTransactionViewEvent {
@@ -69,6 +71,9 @@ sealed interface EditTransactionViewEvent {
     data class OnImageCaptured(val success: Boolean) : EditTransactionViewEvent
     data object OnViewAttachment : EditTransactionViewEvent
     data object OnRemoveAttachment : EditTransactionViewEvent
+    data object OnRemoveLocation : EditTransactionViewEvent
+    data object OnCaptureLocation : EditTransactionViewEvent
+    data class OnViewLocation(val location: Location) : EditTransactionViewEvent
 
     sealed interface TagEvent : EditTransactionViewEvent {
         data class SaveTag(val name: String) : TagEvent

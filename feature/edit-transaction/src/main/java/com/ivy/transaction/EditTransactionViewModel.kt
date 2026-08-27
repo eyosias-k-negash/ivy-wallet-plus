@@ -81,6 +81,10 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
 import javax.inject.Inject
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
+import com.ivy.data.model.Location
 
 @Suppress("LargeClass")
 @Stable
@@ -140,6 +144,7 @@ class EditTransactionViewModel @Inject constructor(
 
     private var customExchangeRateState by mutableStateOf(CustomExchangeRateState())
     private var attachmentUrl by mutableStateOf<String?>(null)
+    private var location by mutableStateOf<Location?>(null)
     var cameraTempUri by mutableStateOf<Uri?>(null)
         private set
 
@@ -191,6 +196,44 @@ class EditTransactionViewModel @Inject constructor(
                 tagRepository.findByAssociatedId(AssociationId(loadedTransaction().id)).map(Tag::id)
                     .toImmutableList()
             display(loadedTransaction!!)
+
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    fun captureLocation() {
+        val hasCoarse = androidx.core.content.ContextCompat.checkSelfPermission(
+            context,
+            android.Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+        val hasFine = androidx.core.content.ContextCompat.checkSelfPermission(
+            context,
+            android.Manifest.permission.ACCESS_FINE_LOCATION
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+        if (!hasCoarse && !hasFine) {
+            return
+        }
+
+        val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+        fusedLocationClient.getCurrentLocation(
+            Priority.PRIORITY_HIGH_ACCURACY,
+            CancellationTokenSource().token
+        ).addOnSuccessListener { loc ->
+            if (loc != null) {
+                location = Location(lat = loc.latitude, lng = loc.longitude)
+                saveIfEditMode()
+            } else {
+                viewModelScope.launch {
+                    toaster.show(R.string.msg_turn_on_location)
+                }
+            }
+        }.addOnFailureListener { e ->
+            e.printStackTrace()
+            viewModelScope.launch {
+                toaster.show(R.string.msg_turn_on_location)
+            }
         }
     }
 
@@ -216,7 +259,8 @@ class EditTransactionViewModel @Inject constructor(
             customExchangeRateState = getCustomExchangeRateState(),
             tags = getTags(),
             transactionAssociatedTags = getTransactionAssociatedTags(),
-            attachmentUrl = attachmentUrl
+            attachmentUrl = attachmentUrl,
+            location = location
         )
     }
 
@@ -352,7 +396,28 @@ class EditTransactionViewModel @Inject constructor(
             is EditTransactionViewEvent.OnImageCaptured -> onImageCaptured(event.success)
             EditTransactionViewEvent.OnViewAttachment -> onViewAttachment()
             EditTransactionViewEvent.OnRemoveAttachment -> onRemoveAttachment()
+            EditTransactionViewEvent.OnRemoveLocation -> onRemoveLocation()
+            EditTransactionViewEvent.OnCaptureLocation -> captureLocation()
+            is EditTransactionViewEvent.OnViewLocation -> onViewLocation(event.location)
         }
+    }
+
+    private fun onViewLocation(location: Location) {
+        val gmmIntentUri = Uri.parse("geo:0,0?q=${location.lat},${location.lng}(${location.name ?: ""})")
+        val mapIntent = Intent(Intent.ACTION_VIEW, gmmIntentUri)
+        mapIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            context.startActivity(mapIntent)
+        } catch (e: Exception) {
+            viewModelScope.launch {
+                toaster.show(R.string.error)
+            }
+        }
+    }
+
+    private fun onRemoveLocation() {
+        location = null
+        saveIfEditMode()
     }
 
     private fun handleTagEvent(event: EditTransactionViewEvent.TagEvent) {
@@ -406,6 +471,15 @@ class EditTransactionViewModel @Inject constructor(
             accountByIdAct(it)
         }
         attachmentUrl = transaction.attachmentUrl
+        location = if (transaction.locationLat != null && transaction.locationLng != null) {
+            Location(
+                lat = transaction.locationLat!!,
+                lng = transaction.locationLng!!,
+                name = transaction.locationName
+            )
+        } else {
+            null
+        }
         category = transaction.categoryId?.let {
             categoryRepository.findById(CategoryId(it))
         }
@@ -745,6 +819,9 @@ class EditTransactionViewModel @Inject constructor(
                     },
                     categoryId = category?.id?.value,
                     attachmentUrl = attachmentUrl,
+                    locationLat = location?.lat,
+                    locationLng = location?.lng,
+                    locationName = location?.name,
                     isSynced = false
                 )
 

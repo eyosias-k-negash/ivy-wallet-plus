@@ -206,7 +206,8 @@ fun TransactionCard(
             },
             currency = transactionCurrency,
             amount = transaction.amount.toDouble(),
-            hasAttachment = transaction.attachmentUrl != null
+            hasAttachment = transaction.attachmentUrl != null,
+            hasLocation = transaction.locationLat != null
         )
 
         if (transaction.type == TransactionType.TRANSFER && toAccountCurrency != transactionCurrency) {
@@ -564,7 +565,8 @@ fun TypeAmountCurrency(
     currency: String,
     amount: Double,
     modifier: Modifier = Modifier,
-    hasAttachment: Boolean = false
+    hasAttachment: Boolean = false,
+    hasLocation: Boolean = false
 ) {
     Row(
         modifier = modifier.testTag("type_amount_currency"),
@@ -646,6 +648,15 @@ fun TypeAmountCurrency(
             Spacer(Modifier.width(8.dp))
             IvyIcon(
                 icon = R.drawable.ic_attachment,
+                tint = UI.colors.gray,
+                modifier = Modifier.height(16.dp).width(16.dp)
+            )
+        }
+
+        if (hasLocation) {
+            Spacer(Modifier.width(8.dp))
+            IvyIcon(
+                icon = R.drawable.ic_vue_location_location,
                 tint = UI.colors.gray,
                 modifier = Modifier.height(16.dp).width(16.dp)
             )

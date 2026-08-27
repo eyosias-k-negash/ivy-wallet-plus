@@ -72,6 +72,7 @@ data class TransactionMetadata(
     // This refers to the loan record id that is linked with a transaction
     val loanRecordId: UUID?,
     val attachmentUrl: String? = null,
+    val location: Location? = null,
 )
 
 fun Transaction.getFromValue(): PositiveValue = when (this) {

@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -39,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import com.ivy.base.legacy.Theme
 import com.ivy.base.model.TransactionType
 import com.ivy.data.model.Category
+import com.ivy.data.model.Location
 import com.ivy.data.model.Tag
 import com.ivy.data.model.TagId
 import com.ivy.design.api.LocalTimeConverter
@@ -94,18 +96,41 @@ import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.UUID
 import kotlin.math.roundToInt
+import com.google.android.gms.common.api.ResolvableApiException
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.LocationSettingsRequest
+import com.google.android.gms.location.Priority
 
 @ExperimentalFoundationApi
 @Composable
 fun BoxWithConstraintsScope.EditTransactionScreen(screen: EditTransactionScreen) {
     val viewModel: EditTransactionViewModel = screenScopedViewModel()
     val uiState = viewModel.uiState()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     LaunchedEffect(Unit) {
         viewModel.start(screen)
     }
 
     val view = LocalView.current
+
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val granted = permissions.values.any { it }
+        if (granted) {
+            viewModel.onEvent(EditTransactionViewEvent.OnCaptureLocation)
+        }
+    }
+
+    val locationSettingsLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            viewModel.onEvent(EditTransactionViewEvent.OnCaptureLocation)
+        }
+    }
 
     UI(
         screen = screen,
@@ -208,7 +233,53 @@ fun BoxWithConstraintsScope.EditTransactionScreen(screen: EditTransactionScreen)
         onAttachAudio = {
             viewModel.onEvent(EditTransactionViewEvent.OnAttachAudio(it))
         },
+        onCaptureLocation = {
+            val coarse = androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            val fine = androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.ACCESS_FINE_LOCATION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+            if (coarse || fine) {
+                val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000).build()
+                val builder = LocationSettingsRequest.Builder().addLocationRequest(locationRequest)
+                val client = LocationServices.getSettingsClient(context)
+                val task = client.checkLocationSettings(builder.build())
+
+                task.addOnSuccessListener {
+                    viewModel.onEvent(EditTransactionViewEvent.OnCaptureLocation)
+                }
+
+                task.addOnFailureListener { exception ->
+                    if (exception is ResolvableApiException) {
+                        try {
+                            val intentSenderRequest = IntentSenderRequest.Builder(exception.resolution).build()
+                            locationSettingsLauncher.launch(intentSenderRequest)
+                        } catch (sendEx: Exception) {
+                            // Ignore the error.
+                        }
+                    } else {
+                        viewModel.onEvent(EditTransactionViewEvent.OnCaptureLocation)
+                    }
+                }
+            } else {
+                locationPermissionLauncher.launch(
+                    arrayOf(
+                        android.Manifest.permission.ACCESS_COARSE_LOCATION,
+                        android.Manifest.permission.ACCESS_FINE_LOCATION
+                    )
+                )
+            }
+        },
+        onViewLocation = {
+            viewModel.onEvent(EditTransactionViewEvent.OnViewLocation(it))
+        },
+        onRemoveLocation = {
+            viewModel.onEvent(EditTransactionViewEvent.OnRemoveLocation)
+        },
         attachmentUrl = uiState.attachmentUrl,
+        location = uiState.location,
         cameraTempUri = viewModel.cameraTempUri
     )
 }
@@ -262,7 +333,11 @@ private fun BoxWithConstraintsScope.UI(
     onViewAttachment: () -> Unit = {},
     onRemoveAttachment: () -> Unit = {},
     onAttachAudio: (android.net.Uri) -> Unit = {},
+    onCaptureLocation: () -> Unit = {},
+    onViewLocation: (Location) -> Unit = {},
+    onRemoveLocation: () -> Unit = {},
     attachmentUrl: String? = null,
+    location: Location? = null,
     cameraTempUri: android.net.Uri? = null,
     loanData: EditTransactionDisplayLoan = EditTransactionDisplayLoan(),
     backgroundProcessing: Boolean = false,
@@ -281,6 +356,7 @@ private fun BoxWithConstraintsScope.UI(
     var accountChangeModal by remember { mutableStateOf(false) }
     var showAttachmentOptions by remember { mutableStateOf(false) }
     var showRemoveAttachmentConfirm by remember { mutableStateOf(false) }
+    var showRemoveLocationConfirm by remember { mutableStateOf(false) }
 
     val pickImageLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -461,6 +537,10 @@ private fun BoxWithConstraintsScope.UI(
             dueDateTime = dueDate,
             onEditDate = onSetDate,
             onEditTime = onSetTime,
+            location = location,
+            onCaptureLocation = onCaptureLocation,
+            onViewLocation = onViewLocation,
+            onRemoveLocation = { showRemoveLocationConfirm = true }
         )
 
         if (transactionType == TransactionType.TRANSFER && customExchangeRateState.showCard) {
@@ -784,6 +864,18 @@ private fun BoxWithConstraintsScope.UI(
         ) {
             onRemoveAttachment()
             showRemoveAttachmentConfirm = false
+        }
+    }
+
+    if (showRemoveLocationConfirm) {
+        DeleteModal(
+            visible = showRemoveLocationConfirm,
+            title = stringResource(R.string.remove_location),
+            description = stringResource(R.string.confirm_deletion),
+            dismiss = { showRemoveLocationConfirm = false }
+        ) {
+            onRemoveLocation()
+            showRemoveLocationConfirm = false
         }
     }
 }

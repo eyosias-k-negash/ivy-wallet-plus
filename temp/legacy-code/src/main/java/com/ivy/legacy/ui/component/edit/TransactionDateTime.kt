@@ -1,6 +1,8 @@
 package com.ivy.legacy.ui.component.edit
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import com.ivy.design.api.LocalTimeConverter
 import com.ivy.design.api.LocalTimeFormatter
 import com.ivy.design.api.LocalTimeProvider
+import com.ivy.data.model.Location
 import com.ivy.design.l0_system.UI
 import com.ivy.design.l0_system.style
 import com.ivy.legacy.IvyWalletComponentPreview
@@ -28,6 +31,7 @@ import com.ivy.ui.time.TimeFormatter
 import com.ivy.wallet.ui.theme.components.IvyIcon
 import java.time.Instant
 
+@OptIn(ExperimentalFoundationApi::class)
 @Suppress("MultipleEmitters")
 @Deprecated("Old design system. Use `:ivy-design` and Material3")
 @Composable
@@ -36,6 +40,10 @@ fun TransactionDateTime(
     dueDateTime: Instant?,
     onEditDate: () -> Unit,
     onEditTime: () -> Unit,
+    location: Location?,
+    onCaptureLocation: () -> Unit,
+    onViewLocation: (Location) -> Unit,
+    onRemoveLocation: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (dueDateTime == null || dateTime != null) {
@@ -96,7 +104,24 @@ fun TransactionDateTime(
                     onEditTime()
                 }
             )
-            Spacer(modifier = Modifier.width(24.dp))
+
+            Spacer(Modifier.width(16.dp))
+
+            IvyIcon(
+                icon = R.drawable.ic_vue_location_location,
+                tint = if (location != null) UI.colors.primary else UI.colors.gray,
+                modifier = Modifier
+                    .combinedClickable(
+                        onClick = {
+                            if (location != null) onViewLocation(location)
+                            else onCaptureLocation()
+                        },
+                        onLongClick = if (location != null) onRemoveLocation else null
+                    )
+                    .padding(8.dp)
+            )
+
+            Spacer(modifier = Modifier.width(32.dp))
         }
     }
 }
@@ -108,10 +133,12 @@ private fun Preview() {
         TransactionDateTime(
             dateTime = LocalTimeProvider.current.utcNow(),
             dueDateTime = null,
-            onEditDate = {
-            },
-            onEditTime = {
-            }
+            onEditDate = {},
+            onEditTime = {},
+            location = null,
+            onCaptureLocation = {},
+            onViewLocation = {},
+            onRemoveLocation = {}
         )
     }
 }
