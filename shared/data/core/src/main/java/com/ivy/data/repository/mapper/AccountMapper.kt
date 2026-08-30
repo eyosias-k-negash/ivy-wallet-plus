@@ -6,6 +6,7 @@ import arrow.core.raise.ensure
 import com.ivy.data.db.entity.AccountEntity
 import com.ivy.data.model.Account
 import com.ivy.data.model.AccountId
+import com.ivy.data.model.TagId
 import com.ivy.data.model.primitive.AssetCode
 import com.ivy.data.model.primitive.ColorInt
 import com.ivy.data.model.primitive.IconAsset
@@ -28,6 +29,19 @@ class AccountMapper @Inject constructor(
             icon = icon?.let(IconAsset::from)?.getOrNull(),
             includeInBalance = includeInBalance,
             orderNum = orderNum,
+            smsAutoListenEnabled = smsAutoListenEnabled,
+            smsSenderPhone = smsSenderPhone,
+            smsSubscriptionId = smsSubscriptionId,
+            smsReceiverPhone = smsReceiverPhone,
+            smsParsingRegex = smsParsingRegex,
+            useMultiRegex = useMultiRegex,
+            smsIncomeRegex = smsIncomeRegex,
+            smsExpenseRegex = smsExpenseRegex,
+            smsAmountRegex = smsAmountRegex,
+            smsDateTimeRegex = smsDateTimeRegex,
+            smsDescriptionRegex = smsDescriptionRegex,
+            smsBalanceRegex = smsBalanceRegex,
+            autoTagId = autoTagId?.let(::TagId),
         )
     }
 
@@ -39,6 +53,19 @@ class AccountMapper @Inject constructor(
             icon = icon?.id,
             orderNum = orderNum,
             includeInBalance = includeInBalance,
+            smsAutoListenEnabled = smsAutoListenEnabled,
+            smsSenderPhone = smsSenderPhone,
+            smsSubscriptionId = smsSubscriptionId,
+            smsReceiverPhone = smsReceiverPhone,
+            smsParsingRegex = smsParsingRegex,
+            useMultiRegex = useMultiRegex,
+            smsIncomeRegex = smsIncomeRegex,
+            smsExpenseRegex = smsExpenseRegex,
+            smsAmountRegex = smsAmountRegex,
+            smsDateTimeRegex = smsDateTimeRegex,
+            smsDescriptionRegex = smsDescriptionRegex,
+            smsBalanceRegex = smsBalanceRegex,
+            autoTagId = autoTagId?.value,
             id = id.value,
             isSynced = true, // TODO: Delete this
         )

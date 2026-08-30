@@ -181,20 +181,25 @@ class EditTransactionViewModel @Inject constructor(
             loadedTransaction = screen.initialTransactionId?.let {
                 trnByIdAct(it)
             } ?: Transaction(
-                accountId = defaultAccountId(
+                accountId = screen.accountId ?: defaultAccountId(
                     screen = screen,
                     accounts = getAccounts
                 ),
                 categoryId = screen.categoryId,
                 type = screen.type,
-                amount = BigDecimal.ZERO,
-                toAmount = BigDecimal.ZERO
+                amount = screen.amount?.toBigDecimal() ?: BigDecimal.ZERO,
+                toAmount = BigDecimal.ZERO,
+                title = screen.title,
+                dateTime = screen.dateTime?.let { Instant.ofEpochMilli(it) } ?: timeProvider.utcNow()
             )
 
             tags = tagList.await()
-            transactionAssociatedTags =
+            transactionAssociatedTags = if (editMode) {
                 tagRepository.findByAssociatedId(AssociationId(loadedTransaction().id)).map(Tag::id)
                     .toImmutableList()
+            } else {
+                screen.tagIds.map { TagId(it) }.toImmutableList()
+            }
             display(loadedTransaction!!)
 
         }
