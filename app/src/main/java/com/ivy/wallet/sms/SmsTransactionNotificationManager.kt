@@ -21,6 +21,7 @@ class SmsTransactionNotificationManager @Inject constructor(
         amount: Double,
         type: TransactionType,
         title: String,
+        description: String?,
         dateTime: Long,
         accountId: UUID,
         tagIds: List<UUID>,
@@ -31,6 +32,9 @@ class SmsTransactionNotificationManager @Inject constructor(
             putExtra(RootViewModel.EXTRA_ADD_TRANSACTION_TYPE, type.name)
             putExtra(RootViewModel.EXTRA_AMOUNT, amount)
             putExtra(RootViewModel.EXTRA_TITLE, title)
+            if (description != null) {
+                putExtra(RootViewModel.EXTRA_DESCRIPTION, description)
+            }
             putExtra(RootViewModel.EXTRA_DATE_TIME, dateTime)
             putExtra(RootViewModel.EXTRA_ACCOUNT_ID, accountId.toString())
             putExtra(RootViewModel.EXTRA_TAG_IDS, tagIds.map { it.toString() }.toTypedArray())

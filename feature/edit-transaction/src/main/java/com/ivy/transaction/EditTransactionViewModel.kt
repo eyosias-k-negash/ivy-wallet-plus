@@ -190,6 +190,7 @@ class EditTransactionViewModel @Inject constructor(
                 amount = screen.amount?.toBigDecimal() ?: BigDecimal.ZERO,
                 toAmount = BigDecimal.ZERO,
                 title = screen.title,
+                description = screen.description,
                 dateTime = screen.dateTime?.let { Instant.ofEpochMilli(it) } ?: timeProvider.utcNow()
             )
 

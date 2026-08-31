@@ -36,7 +36,7 @@ class AccountCreator @Inject constructor(
     ) {
         ioThread {
             val autoTagId = if (data.smsAutoListenEnabled && data.autoTagId == null) {
-                createCanonicalTag(data.name, data.smsSubscriptionId ?: 0)
+                createCanonicalTag(data.name)
             } else {
                 data.autoTagId?.let { com.ivy.data.model.TagId(it) }
             }
@@ -100,8 +100,8 @@ class AccountCreator @Inject constructor(
         onRefreshUI()
     }
 
-    private suspend fun createCanonicalTag(accountName: String, subscriptionId: Int): com.ivy.data.model.TagId {
-        val tagName = "$accountName-$subscriptionId"
+    private suspend fun createCanonicalTag(accountName: String): com.ivy.data.model.TagId {
+        val tagName = "AUTO-$accountName"
         val existingTags = tagRepository.findByText(tagName)
         if (existingTags.isNotEmpty()) {
             return existingTags.first().id
@@ -130,7 +130,7 @@ class AccountCreator @Inject constructor(
         )
         ioThread {
             val autoTagId = if (legacyAccount.smsAutoListenEnabled && legacyAccount.autoTagId == null) {
-                createCanonicalTag(legacyAccount.name, legacyAccount.smsSubscriptionId ?: 0)
+                createCanonicalTag(legacyAccount.name)
             } else {
                 legacyAccount.autoTagId?.let { com.ivy.data.model.TagId(it) }
             }

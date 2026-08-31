@@ -47,12 +47,12 @@ I have implemented several enhancements to the SMS transaction listening feature
 ### 8. Advanced Multi-Regex Parsing
 - **New Feature**: Added a "Use Advanced Multi-Regex" option for more complex SMS formats.
 - **Granular Control**: Instead of one regex for everything, you can now define separate regexes for:
-    1. **Master Match**: To identify if the SMS is a valid transaction.
+    1. **Master Match**: To identify if the SMS contains transaction data (requires only a partial match).
     2. **Income/Expense Identification**: Specific regexes to detect the transaction type.
-    3. **Amount Extraction**: Regex to pick out the exact amount.
-    4. **Date/Time Extraction**: Regex to parse the transaction timestamp.
-    5. **Description Extraction**: Regex to grab a meaningful title from the SMS.
-    6. **Balance Extraction**: Regex to identify the remaining account balance.
+    3. **Amount Extraction**: Regex to pick out the exact amount (from the 1st capturing group).
+    4. **Date/Time Extraction**: Regex to parse the transaction timestamp (supporting 3 or 6 groups).
+    5. **Description Extraction**: Joins all capturing groups from this regex with new lines for the title.
+    6. **Balance Extraction**: Regex to identify the remaining account balance (from the 1st capturing group).
 - **Database Migration**: Upgraded database to version **134** to support these new fields.
 - **Improved Logic**: `SmsReceiver` now intelligently switches between the simple single-regex mode and the advanced multi-regex mode based on your account settings.
 

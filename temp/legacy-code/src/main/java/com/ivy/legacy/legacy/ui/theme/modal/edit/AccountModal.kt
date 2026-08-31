@@ -68,7 +68,16 @@ import com.ivy.wallet.ui.theme.modal.IvyModal
 import com.ivy.wallet.ui.theme.modal.ModalAddSave
 import com.ivy.wallet.ui.theme.modal.ModalAmountSection
 import com.ivy.wallet.ui.theme.modal.ModalTitle
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.InternalSerializationApi
 import java.util.UUID
+
+private val json = Json {
+    ignoreUnknownKeys = true
+    isLenient = true
+    encodeDefaults = true
+}
 
 @Deprecated("Old design system. Use `:ivy-design` and Material3")
 data class AccountModalData(
@@ -165,6 +174,32 @@ fun BoxWithConstraintsScope.AccountModal(
                 val name = getContactNameFromUri(context, it)
                 if (name != null) {
                     smsSenderPhone = TextFieldValue(name)
+                }
+            }
+        }
+    )
+
+    val smsConfigPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+        onResult = { uri ->
+            uri?.let {
+                try {
+                    context.contentResolver.openInputStream(it)?.use { stream ->
+                        val jsonStr = stream.bufferedReader().readText()
+                        val config = json.decodeFromString<SmsRegexConfig>(jsonStr)
+                        smsParsingRegex = TextFieldValue(config.masterMatch ?: "")
+                        useMultiRegex = config.useMultiRegex
+                        smsIncomeRegex = TextFieldValue(config.incomeRegex ?: "")
+                        smsExpenseRegex = TextFieldValue(config.expenseRegex ?: "")
+                        smsAmountRegex = TextFieldValue(config.amountRegex ?: "")
+                        smsDateTimeRegex = TextFieldValue(config.dateTimeRegex ?: "")
+                        smsDescriptionRegex = TextFieldValue(config.descriptionRegex ?: "")
+                        smsBalanceRegex = TextFieldValue(config.balanceRegex ?: "")
+                        android.widget.Toast.makeText(context, "Config imported successfully!", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    android.widget.Toast.makeText(context, "Failed to import config: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -343,14 +378,25 @@ fun BoxWithConstraintsScope.AccountModal(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            IvyCheckboxWithText(
-                modifier = Modifier
-                    .padding(start = 16.dp)
-                    .align(Alignment.Start),
-                text = "Use Advanced Multi-Regex",
-                checked = useMultiRegex
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(end = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                useMultiRegex = it
+                IvyCheckboxWithText(
+                    modifier = Modifier
+                        .padding(start = 16.dp),
+                    text = "Use Advanced Multi-Regex",
+                    checked = useMultiRegex
+                ) {
+                    useMultiRegex = it
+                }
+
+                Text(
+                    modifier = Modifier.clickable { smsConfigPickerLauncher.launch(arrayOf("application/json", "text/*")) },
+                    text = "IMPORT CONFIG",
+                    style = UI.typo.c.style(color = UI.colors.primary, fontWeight = FontWeight.ExtraBold)
+                )
             }
 
             if (useMultiRegex) {
@@ -786,3 +832,16 @@ private fun Preview() {
         }
     }
 }
+
+@OptIn(InternalSerializationApi::class)
+@Serializable
+internal data class SmsRegexConfig(
+    val masterMatch: String? = null,
+    val useMultiRegex: Boolean = false,
+    val incomeRegex: String? = null,
+    val expenseRegex: String? = null,
+    val amountRegex: String? = null,
+    val dateTimeRegex: String? = null,
+    val descriptionRegex: String? = null,
+    val balanceRegex: String? = null
+)

@@ -31,6 +31,7 @@ data class EditTransactionScreen(
     val categoryId: UUID? = null,
     val amount: Double? = null,
     val title: String? = null,
+    val description: String? = null,
     val dateTime: Long? = null,
     val tagIds: List<UUID> = emptyList(),
 ) : Screen {
