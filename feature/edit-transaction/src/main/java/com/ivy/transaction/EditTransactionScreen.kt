@@ -1,5 +1,8 @@
 package com.ivy.transaction
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.BoxWithConstraintsScope
 import androidx.compose.foundation.layout.Column
@@ -72,6 +75,7 @@ import com.ivy.wallet.ui.theme.modal.ModalAdd
 import com.ivy.wallet.ui.theme.modal.ModalCheck
 import com.ivy.wallet.ui.theme.modal.ModalSave
 import com.ivy.wallet.ui.theme.modal.ProgressModal
+import com.ivy.wallet.ui.theme.modal.IvyModal
 import com.ivy.wallet.ui.theme.modal.edit.AccountModal
 import com.ivy.wallet.ui.theme.modal.edit.AccountModalData
 import com.ivy.wallet.ui.theme.modal.edit.AmountModal
@@ -183,7 +187,24 @@ fun BoxWithConstraintsScope.EditTransactionScreen(screen: EditTransactionScreen)
         },
         onTagOperation = {
             viewModel.onEvent(it)
-        }
+        },
+        onAttachImage = {
+            viewModel.onEvent(EditTransactionViewEvent.OnAttachImage(it))
+        },
+        onRequestCaptureImage = {
+            viewModel.onEvent(EditTransactionViewEvent.OnRequestCaptureImage)
+        },
+        onImageCaptured = {
+            viewModel.onEvent(EditTransactionViewEvent.OnImageCaptured(it))
+        },
+        onViewAttachment = {
+            viewModel.onEvent(EditTransactionViewEvent.OnViewAttachment)
+        },
+        onRemoveAttachment = {
+            viewModel.onEvent(EditTransactionViewEvent.OnRemoveAttachment)
+        },
+        attachmentUrl = uiState.attachmentUrl,
+        cameraTempUri = viewModel.cameraTempUri
     )
 }
 
@@ -230,6 +251,13 @@ private fun BoxWithConstraintsScope.UI(
     onCreateAccount: (CreateAccountData) -> Unit,
     onExchangeRateChange: (Double?) -> Unit = { },
     onTagOperation: (EditTransactionViewEvent.TagEvent) -> Unit = {},
+    onAttachImage: (android.net.Uri) -> Unit = {},
+    onRequestCaptureImage: () -> Unit = {},
+    onImageCaptured: (Boolean) -> Unit = {},
+    onViewAttachment: () -> Unit = {},
+    onRemoveAttachment: () -> Unit = {},
+    attachmentUrl: String? = null,
+    cameraTempUri: android.net.Uri? = null,
     loanData: EditTransactionDisplayLoan = EditTransactionDisplayLoan(),
     backgroundProcessing: Boolean = false,
     hasChanges: Boolean = false,
@@ -245,6 +273,21 @@ private fun BoxWithConstraintsScope.UI(
     var amountModalShown by remember { mutableStateOf(false) }
     var exchangeRateAmountModalShown by remember { mutableStateOf(false) }
     var accountChangeModal by remember { mutableStateOf(false) }
+    var showAttachmentOptions by remember { mutableStateOf(false) }
+    var showRemoveAttachmentConfirm by remember { mutableStateOf(false) }
+
+    val pickImageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        uri?.let { onAttachImage(it) }
+    }
+
+    val takePictureLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        onImageCaptured(success)
+    }
+
     val waitModalVisible by remember(backgroundProcessing) {
         mutableStateOf(backgroundProcessing)
     }
@@ -376,6 +419,23 @@ private fun BoxWithConstraintsScope.UI(
             onAddDescription = { descriptionModalVisible = true },
             onEditDescription = { descriptionModalVisible = true }
         )
+
+        Spacer(Modifier.height(12.dp))
+
+        if (attachmentUrl == null) {
+            AddPrimaryAttributeButton(
+                icon = R.drawable.ic_attachment,
+                text = stringResource(R.string.add_attachment),
+                onClick = { showAttachmentOptions = true }
+            )
+        } else {
+            AddPrimaryAttributeButton(
+                icon = R.drawable.ic_attachment,
+                text = stringResource(R.string.image_attached),
+                onClick = onViewAttachment,
+                onLongClick = { showRemoveAttachmentConfirm = true }
+            )
+        }
 
         TransactionDateTime(
             dateTime = dateTime,
@@ -640,6 +700,61 @@ private fun BoxWithConstraintsScope.UI(
             onTagOperation(EditTransactionViewEvent.TagEvent.OnTagSearch(it))
         }
     )
+
+    if (showAttachmentOptions) {
+        IvyModal(
+            id = remember { UUID.randomUUID() },
+            visible = showAttachmentOptions,
+            dismiss = { showAttachmentOptions = false },
+            PrimaryAction = {}
+        ) {
+            Text(
+                modifier = Modifier.padding(24.dp),
+                text = stringResource(R.string.add_attachment),
+                style = UI.typo.b1.style(
+                    color = UI.colors.pureInverse,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            )
+
+            AddPrimaryAttributeButton(
+                icon = R.drawable.ic_attachment,
+                text = stringResource(R.string.take_photo),
+                onClick = {
+                    onRequestCaptureImage()
+                    cameraTempUri?.let { takePictureLauncher.launch(it) }
+                    showAttachmentOptions = false
+                }
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            AddPrimaryAttributeButton(
+                icon = R.drawable.ic_attachment,
+                text = stringResource(R.string.choose_from_gallery),
+                onClick = {
+                    pickImageLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                    showAttachmentOptions = false
+                }
+            )
+
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+
+    if (showRemoveAttachmentConfirm) {
+        DeleteModal(
+            visible = showRemoveAttachmentConfirm,
+            title = stringResource(R.string.remove_attachment),
+            description = stringResource(R.string.confirm_deletion),
+            dismiss = { showRemoveAttachmentConfirm = false }
+        ) {
+            onRemoveAttachment()
+            showRemoveAttachmentConfirm = false
+        }
+    }
 }
 
 private fun shouldFocusCategory(

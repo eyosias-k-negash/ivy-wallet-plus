@@ -1,8 +1,9 @@
 package com.ivy.wallet.ui.theme.components
 
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,11 +22,13 @@ import com.ivy.design.l0_system.style
 import com.ivy.legacy.IvyWalletComponentPreview
 import com.ivy.ui.R
 
+@OptIn(ExperimentalFoundationApi::class)
 @Deprecated("Old design system. Use `:ivy-design` and Material3")
 @Composable
 fun AddPrimaryAttributeButton(
     @DrawableRes icon: Int,
     text: String,
+    onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit
 ) {
     Row(
@@ -34,7 +37,10 @@ fun AddPrimaryAttributeButton(
             .padding(horizontal = 16.dp)
             .clip(UI.shapes.r4)
             .background(UI.colors.medium, UI.shapes.r4)
-            .clickable(onClick = onClick)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
             .padding(vertical = 20.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

@@ -205,7 +205,8 @@ fun TransactionCard(
                 transaction.dueDate?.toLocalDateTime()
             },
             currency = transactionCurrency,
-            amount = transaction.amount.toDouble()
+            amount = transaction.amount.toDouble(),
+            hasAttachment = transaction.attachmentUrl != null
         )
 
         if (transaction.type == TransactionType.TRANSFER && toAccountCurrency != transactionCurrency) {
@@ -562,7 +563,8 @@ fun TypeAmountCurrency(
     dueDate: LocalDateTime?,
     currency: String,
     amount: Double,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    hasAttachment: Boolean = false
 ) {
     Row(
         modifier = modifier.testTag("type_amount_currency"),
@@ -639,6 +641,15 @@ fun TypeAmountCurrency(
             currency = currency,
             textColor = style.textColor
         )
+
+        if (hasAttachment) {
+            Spacer(Modifier.width(8.dp))
+            IvyIcon(
+                icon = R.drawable.ic_attachment,
+                tint = UI.colors.gray,
+                modifier = Modifier.height(16.dp).width(16.dp)
+            )
+        }
 
         Spacer(Modifier.width(24.dp))
     }
