@@ -28,7 +28,12 @@ data class EditTransactionScreen(
     val type: TransactionType,
     // extras
     val accountId: UUID? = null,
-    val categoryId: UUID? = null
+    val categoryId: UUID? = null,
+    val amount: Double? = null,
+    val title: String? = null,
+    val description: String? = null,
+    val dateTime: Long? = null,
+    val tagIds: List<UUID> = emptyList(),
 ) : Screen {
     override val isLegacy: Boolean
         get() = true

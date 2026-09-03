@@ -155,6 +155,10 @@ fun BoxWithConstraintsScope.TransactionsScreen(screen: TransactionsScreen) {
         overdueIncome = uiState.overdueIncome,
         overdueExpenses = uiState.overdueExpenses,
 
+        onDayClick = { date ->
+            viewModel.onEvent(TransactionsEvent.ToggleBalanceMode(date))
+        },
+
         onSetPeriod = {
             viewModel.onEvent(
                 TransactionsEvent.SetPeriod(
@@ -242,6 +246,7 @@ private fun BoxWithConstraintsScope.UI(
     onDelete: () -> Unit,
     deleteModal1Visible: Boolean,
     onDeleteModal1Visible: (Boolean) -> Unit,
+    onDayClick: (java.time.LocalDate) -> Unit = {},
 
     initWithTransactions: Boolean = false,
     treatTransfersAsIncomeExpense: Boolean = false,
@@ -384,7 +389,7 @@ private fun BoxWithConstraintsScope.UI(
 
             transactions(
                 baseData = AppBaseData(
-                    baseCurrency,
+                    currency,
                     accounts,
                     categories
                 ),
@@ -409,6 +414,7 @@ private fun BoxWithConstraintsScope.UI(
                 setOverdueExpanded = setOverdueExpanded,
 
                 history = history,
+                onDayClick = onDayClick,
                 lastItemSpacer = with(density) {
                     (ivyContext.screenHeight * 0.7f).toDp()
                 },

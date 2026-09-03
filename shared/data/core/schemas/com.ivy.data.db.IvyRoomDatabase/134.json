@@ -1,12 +1,12 @@
 {
   "formatVersion": 1,
   "database": {
-    "version": 130,
-    "identityHash": "68298d41e1463e38ac0c1d0acc780dd2",
+    "version": 134,
+    "identityHash": "a79d1b2378663e68b69e33e6ae6302e5",
     "entities": [
       {
         "tableName": "accounts",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`name` TEXT NOT NULL, `currency` TEXT, `color` INTEGER NOT NULL, `icon` TEXT, `orderNum` REAL NOT NULL, `includeInBalance` INTEGER NOT NULL, `isSynced` INTEGER NOT NULL, `isDeleted` INTEGER NOT NULL, `id` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`name` TEXT NOT NULL, `currency` TEXT, `color` INTEGER NOT NULL, `icon` TEXT, `orderNum` REAL NOT NULL, `includeInBalance` INTEGER NOT NULL, `smsAutoListenEnabled` INTEGER NOT NULL DEFAULT 0, `smsSenderPhone` TEXT, `smsSubscriptionId` INTEGER, `smsReceiverPhone` TEXT, `smsParsingRegex` TEXT, `useMultiRegex` INTEGER NOT NULL DEFAULT 0, `smsIncomeRegex` TEXT, `smsExpenseRegex` TEXT, `smsAmountRegex` TEXT, `smsDateTimeRegex` TEXT, `smsDescriptionRegex` TEXT, `smsBalanceRegex` TEXT, `autoTagId` TEXT, `isSynced` INTEGER NOT NULL, `isDeleted` INTEGER NOT NULL, `id` TEXT NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "name",
@@ -43,6 +43,86 @@
             "columnName": "includeInBalance",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "smsAutoListenEnabled",
+            "columnName": "smsAutoListenEnabled",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "smsSenderPhone",
+            "columnName": "smsSenderPhone",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "smsSubscriptionId",
+            "columnName": "smsSubscriptionId",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "smsReceiverPhone",
+            "columnName": "smsReceiverPhone",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "smsParsingRegex",
+            "columnName": "smsParsingRegex",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "useMultiRegex",
+            "columnName": "useMultiRegex",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "smsIncomeRegex",
+            "columnName": "smsIncomeRegex",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "smsExpenseRegex",
+            "columnName": "smsExpenseRegex",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "smsAmountRegex",
+            "columnName": "smsAmountRegex",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "smsDateTimeRegex",
+            "columnName": "smsDateTimeRegex",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "smsDescriptionRegex",
+            "columnName": "smsDescriptionRegex",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "smsBalanceRegex",
+            "columnName": "smsBalanceRegex",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "autoTagId",
+            "columnName": "autoTagId",
+            "affinity": "TEXT",
+            "notNull": false
           },
           {
             "fieldPath": "isSynced",
@@ -856,7 +936,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '68298d41e1463e38ac0c1d0acc780dd2')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a79d1b2378663e68b69e33e6ae6302e5')"
     ]
   }
 }

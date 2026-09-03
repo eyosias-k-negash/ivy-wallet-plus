@@ -27,6 +27,20 @@ data class Account(
     val isSynced: Boolean = false,
     val isDeleted: Boolean = false,
 
+    val smsAutoListenEnabled: Boolean = false,
+    val smsSenderPhone: String? = null,
+    val smsSubscriptionId: Int? = null,
+    val smsReceiverPhone: String? = null,
+    val smsParsingRegex: String? = null,
+    val useMultiRegex: Boolean = false,
+    val smsIncomeRegex: String? = null,
+    val smsExpenseRegex: String? = null,
+    val smsAmountRegex: String? = null,
+    val smsDateTimeRegex: String? = null,
+    val smsDescriptionRegex: String? = null,
+    val smsBalanceRegex: String? = null,
+    val autoTagId: UUID? = null,
+
     val id: UUID = UUID.randomUUID()
 ) {
     fun toEntity(): AccountEntity = AccountEntity(
@@ -38,6 +52,19 @@ data class Account(
         includeInBalance = includeInBalance,
         isSynced = isSynced,
         isDeleted = isDeleted,
+        smsAutoListenEnabled = smsAutoListenEnabled,
+        smsSenderPhone = smsSenderPhone,
+        smsSubscriptionId = smsSubscriptionId,
+        smsReceiverPhone = smsReceiverPhone,
+        smsParsingRegex = smsParsingRegex,
+        useMultiRegex = useMultiRegex,
+        smsIncomeRegex = smsIncomeRegex,
+        smsExpenseRegex = smsExpenseRegex,
+        smsAmountRegex = smsAmountRegex,
+        smsDateTimeRegex = smsDateTimeRegex,
+        smsDescriptionRegex = smsDescriptionRegex,
+        smsBalanceRegex = smsBalanceRegex,
+        autoTagId = autoTagId,
         id = id
     )
 
@@ -46,7 +73,7 @@ data class Account(
         currencyRepository: CurrencyRepository
     ): Either<String, DomainAccount> {
         return either {
-            Account(
+            DomainAccount(
                 id = AccountId(id),
                 name = NotBlankTrimmedString.from(name).bind(),
                 asset = currency?.let(AssetCode::from)?.bind()
@@ -55,6 +82,19 @@ data class Account(
                 icon = icon?.let(IconAsset::from)?.getOrNull(),
                 includeInBalance = includeInBalance,
                 orderNum = orderNum,
+                smsAutoListenEnabled = smsAutoListenEnabled,
+                smsSenderPhone = smsSenderPhone,
+                smsSubscriptionId = smsSubscriptionId,
+                smsReceiverPhone = smsReceiverPhone,
+                smsParsingRegex = smsParsingRegex,
+                useMultiRegex = useMultiRegex,
+                smsIncomeRegex = smsIncomeRegex,
+                smsExpenseRegex = smsExpenseRegex,
+                smsAmountRegex = smsAmountRegex,
+                smsDateTimeRegex = smsDateTimeRegex,
+                smsDescriptionRegex = smsDescriptionRegex,
+                smsBalanceRegex = smsBalanceRegex,
+                autoTagId = autoTagId?.let { com.ivy.data.model.TagId(it) }
             )
         }
     }

@@ -29,6 +29,7 @@ import com.ivy.navigation.navigation
 import com.ivy.ui.R
 import com.ivy.wallet.domain.data.TransactionHistoryDateDivider
 import com.ivy.wallet.ui.theme.Black
+import java.time.LocalDate
 import com.ivy.wallet.ui.theme.Gradient
 import com.ivy.wallet.ui.theme.Gray
 import com.ivy.wallet.ui.theme.Orange
@@ -54,6 +55,7 @@ fun LazyListScope.transactions(
     onPayOrGet: (Transaction) -> Unit,
     setUpcomingExpanded: (Boolean) -> Unit,
     setOverdueExpanded: (Boolean) -> Unit,
+    onDayClick: (LocalDate) -> Unit = {},
     onSkipTransaction: (Transaction) -> Unit = {},
     onSkipAllTransactions: (List<Transaction>) -> Unit = {}
 ) {
@@ -83,7 +85,8 @@ fun LazyListScope.transactions(
         history = history,
         shouldShowAccountSpecificColorInTransactions = shouldShowAccountSpecificColorInTransactions,
         dateDividerMarginTop = dateDividerMarginTop,
-        onPayOrGet = onPayOrGet
+        onPayOrGet = onPayOrGet,
+        onDayClick = onDayClick
     )
 
     if (
@@ -245,7 +248,8 @@ private fun LazyListScope.historySection(
     shouldShowAccountSpecificColorInTransactions: Boolean,
     dateDividerMarginTop: Dp? = null,
 
-    onPayOrGet: (Transaction) -> Unit
+    onPayOrGet: (Transaction) -> Unit,
+    onDayClick: (LocalDate) -> Unit
 ) {
     if (history.isNotEmpty()) {
         items(
@@ -283,7 +287,9 @@ private fun LazyListScope.historySection(
                             ?: if (it == history.firstOrNull()) 24.dp else 32.dp,
                         baseCurrency = baseData.baseCurrency,
                         income = it.income,
-                        expenses = it.expenses
+                        expenses = it.expenses,
+                        balance = it.balance,
+                        onClick = { onDayClick(it.date) }
                     )
                 }
             }

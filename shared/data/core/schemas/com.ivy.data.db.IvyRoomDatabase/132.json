@@ -1,12 +1,12 @@
 {
   "formatVersion": 1,
   "database": {
-    "version": 130,
-    "identityHash": "68298d41e1463e38ac0c1d0acc780dd2",
+    "version": 132,
+    "identityHash": "55d852334bdd34918ad8cb06b612b65d",
     "entities": [
       {
         "tableName": "accounts",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`name` TEXT NOT NULL, `currency` TEXT, `color` INTEGER NOT NULL, `icon` TEXT, `orderNum` REAL NOT NULL, `includeInBalance` INTEGER NOT NULL, `isSynced` INTEGER NOT NULL, `isDeleted` INTEGER NOT NULL, `id` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`name` TEXT NOT NULL, `currency` TEXT, `color` INTEGER NOT NULL, `icon` TEXT, `orderNum` REAL NOT NULL, `includeInBalance` INTEGER NOT NULL, `smsAutoListenEnabled` INTEGER NOT NULL DEFAULT 0, `smsSenderPhone` TEXT, `smsSubscriptionId` INTEGER, `smsParsingRegex` TEXT, `autoTagId` TEXT, `isSynced` INTEGER NOT NULL, `isDeleted` INTEGER NOT NULL, `id` TEXT NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "name",
@@ -43,6 +43,37 @@
             "columnName": "includeInBalance",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "smsAutoListenEnabled",
+            "columnName": "smsAutoListenEnabled",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "smsSenderPhone",
+            "columnName": "smsSenderPhone",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "smsSubscriptionId",
+            "columnName": "smsSubscriptionId",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "smsParsingRegex",
+            "columnName": "smsParsingRegex",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "autoTagId",
+            "columnName": "autoTagId",
+            "affinity": "TEXT",
+            "notNull": false
           },
           {
             "fieldPath": "isSynced",
@@ -856,7 +887,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '68298d41e1463e38ac0c1d0acc780dd2')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '55d852334bdd34918ad8cb06b612b65d')"
     ]
   }
 }

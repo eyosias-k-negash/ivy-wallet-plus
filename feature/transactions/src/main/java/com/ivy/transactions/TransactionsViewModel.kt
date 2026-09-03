@@ -57,6 +57,7 @@ import com.ivy.wallet.domain.deprecated.logic.CategoryCreator
 import com.ivy.wallet.domain.deprecated.logic.PlannedPaymentsLogic
 import com.ivy.wallet.domain.deprecated.logic.WalletAccountLogic
 import com.ivy.wallet.domain.deprecated.logic.WalletCategoryLogic
+import com.ivy.wallet.domain.pure.data.ClosedTimeRange
 import com.ivy.wallet.domain.pure.exchange.ExchangeData
 import com.ivy.wallet.ui.theme.modal.ChoosePeriodModalData
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -64,9 +65,12 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.launch
+import java.time.LocalDateTime
+import java.time.LocalTime
 import java.util.UUID
 import javax.inject.Inject
 import com.ivy.legacy.datamodel.Account as LegacyAccount
+import com.ivy.wallet.domain.data.TransactionHistoryDateDivider
 
 @Stable
 @HiltViewModel
@@ -134,6 +138,7 @@ class TransactionsViewModel @Inject constructor(
     private val skipAllModalVisible = mutableStateOf(false)
     private val deleteModal1Visible = mutableStateOf(false)
     private val choosePeriodModal = mutableStateOf<ChoosePeriodModalData?>(null)
+    private val balanceModeStartDate = mutableStateOf<java.time.LocalDate?>(null)
 
     @Composable
     override fun uiState(): TransactionsState {
@@ -332,6 +337,95 @@ class TransactionsViewModel @Inject constructor(
             is TransactionsEvent.SetSkipAllModalVisible -> setSkipAllModalVisible(event.visible)
             is TransactionsEvent.OnDeleteModal1Visible -> setDeleteModal1Visible(event.delete)
             is TransactionsEvent.OnChoosePeriodModalData -> setChoosePeriodModalData(event.data)
+            is TransactionsEvent.ToggleBalanceMode -> toggleBalanceMode(event.date)
+        }
+    }
+
+    private fun toggleBalanceMode(date: java.time.LocalDate) {
+        viewModelScope.launch {
+            if (balanceModeStartDate.value == date) {
+                balanceModeStartDate.value = null
+                // Clear all balances in history
+                history.value = history.value.map {
+                    if (it is TransactionHistoryDateDivider) it.copy(balance = null) else it
+                }.toImmutableList()
+            } else {
+                balanceModeStartDate.value = date
+                val currentAccount = account.value ?: return@launch
+                val accountDomain =
+                    accountRepository.findById(AccountId(currentAccount.id)) ?: return@launch
+
+                // 1. Calculate Anchor Balance (Clicked Date)
+                val endOfDay = timeConverter.run { LocalDateTime.of(date, LocalTime.MAX).toUTC() }
+                val anchorBalance = calcAccBalanceAct(
+                    CalcAccBalanceAct.Input(
+                        account = accountDomain,
+                        range = ClosedTimeRange.to(endOfDay)
+                    )
+                ).balance.toDouble()
+
+                // 2. Update history
+                val newHistory = history.value.toMutableList()
+
+                // Find index of clicked divider
+                val clickedIndex =
+                    newHistory.indexOfFirst { it is TransactionHistoryDateDivider && it.date == date }
+                if (clickedIndex == -1) return@launch
+
+                // Set balance for clicked date
+                newHistory[clickedIndex] =
+                    (newHistory[clickedIndex] as TransactionHistoryDateDivider).copy(balance = anchorBalance)
+
+                // Forwards (newer dates, lower indices)
+                var currentBalance = anchorBalance
+                var dailyNetChange = 0.0
+                for (j in clickedIndex - 1 downTo 0) {
+                    val item = newHistory[j]
+                    if (item is com.ivy.base.legacy.Transaction) {
+                        dailyNetChange += calculateLegacyNetChange(item, currentAccount.id)
+                    } else if (item is TransactionHistoryDateDivider) {
+                        currentBalance += dailyNetChange
+                        newHistory[j] = item.copy(balance = currentBalance)
+                        dailyNetChange = 0.0
+                    }
+                }
+
+                // Clear older dates (higher indices)
+                for (j in clickedIndex + 1 until newHistory.size) {
+                    val item = newHistory[j]
+                    if (item is TransactionHistoryDateDivider) {
+                        newHistory[j] = item.copy(balance = null)
+                    }
+                }
+
+                history.value = newHistory.toImmutableList()
+            }
+        }
+    }
+
+    private fun calculateLegacyNetChange(
+        transaction: com.ivy.base.legacy.Transaction,
+        accountId: UUID
+    ): Double {
+        return when (transaction.type) {
+            TransactionType.INCOME -> if (transaction.accountId == accountId) {
+                transaction.amount.toDouble()
+            } else {
+                0.0
+            }
+
+            TransactionType.EXPENSE -> if (transaction.accountId == accountId) {
+                -transaction.amount.toDouble()
+            } else {
+                0.0
+            }
+
+            TransactionType.TRANSFER -> {
+                var change = 0.0
+                if (transaction.accountId == accountId) change -= transaction.amount.toDouble()
+                if (transaction.toAccountId == accountId) change += transaction.toAmount.toDouble()
+                change
+            }
         }
     }
 
@@ -383,7 +477,7 @@ class TransactionsViewModel @Inject constructor(
                 accTrnsAct then {
                     trnsWithDateDivsAct(
                         LegacyTrnsWithDateDivsAct.Input(
-                            baseCurrency = baseCurrency.value,
+                            baseCurrency = currency.value,
                             transactions = with(transactionMapper) {
                                 it.map {
                                     val tags =
@@ -520,7 +614,7 @@ class TransactionsViewModel @Inject constructor(
                 it.categoryId == categoryId && it.type == TransactionType.EXPENSE
             }
 
-            balance.value = ioThread {
+            balance.doubleValue = ioThread {
                 categoryLogic.calculateCategoryBalance(
                     initialCategory,
                     range,
@@ -529,7 +623,7 @@ class TransactionsViewModel @Inject constructor(
                 )
             }
 
-            income.value = ioThread {
+            income.doubleValue = ioThread {
                 categoryLogic.calculateCategoryIncome(
                     incomeTransaction = incomeTrans,
                     accountFilterSet = accountFilterSet
@@ -671,6 +765,7 @@ class TransactionsViewModel @Inject constructor(
     private fun reset() {
         account.value = null
         category.value = null
+        balanceModeStartDate.value = null
     }
 
     private fun setUpcomingExpanded(expanded: Boolean) {

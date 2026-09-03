@@ -30,6 +30,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 
@@ -47,6 +48,12 @@ class RootViewModel @Inject constructor(
 
     companion object {
         const val EXTRA_ADD_TRANSACTION_TYPE = "add_transaction_type_extra"
+        const val EXTRA_AMOUNT = "amount_extra"
+        const val EXTRA_TITLE = "title_extra"
+        const val EXTRA_DESCRIPTION = "description_extra"
+        const val EXTRA_DATE_TIME = "date_time_extra"
+        const val EXTRA_ACCOUNT_ID = "account_id_extra"
+        const val EXTRA_TAG_IDS = "tag_ids_extra"
 
         const val USER_INACTIVITY_TIME_LIMIT = 60 // Time in seconds
     }
@@ -114,10 +121,25 @@ class RootViewModel @Inject constructor(
         }
 
         if (addTrnType != null) {
+            val amount = if (intent.hasExtra(EXTRA_AMOUNT)) intent.getDoubleExtra(EXTRA_AMOUNT, 0.0) else null
+            val title = intent.getStringExtra(EXTRA_TITLE)
+            val description = intent.getStringExtra(EXTRA_DESCRIPTION)
+            val dateTime = if (intent.hasExtra(EXTRA_DATE_TIME)) intent.getLongExtra(EXTRA_DATE_TIME, 0L) else null
+            val accountIdStr = intent.getStringExtra(EXTRA_ACCOUNT_ID)
+            val accountId = accountIdStr?.let { UUID.fromString(it) }
+            val tagIdsStrList = intent.getStringArrayExtra(EXTRA_TAG_IDS)
+            val tagIds = tagIdsStrList?.map { UUID.fromString(it) } ?: emptyList()
+
             nav.navigateTo(
                 EditTransactionScreen(
                     initialTransactionId = null,
-                    type = addTrnType
+                    type = addTrnType,
+                    amount = amount,
+                    title = title,
+                    description = description,
+                    dateTime = dateTime,
+                    accountId = accountId,
+                    tagIds = tagIds
                 )
             )
 

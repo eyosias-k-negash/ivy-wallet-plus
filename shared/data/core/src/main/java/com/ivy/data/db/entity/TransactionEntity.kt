@@ -57,6 +57,12 @@ data class TransactionEntity(
     @SerialName("loanRecordId")
     @Serializable(with = KSerializerUUID::class)
     val loanRecordId: UUID? = null,
+    @SerialName("locationLat")
+    val locationLat: Double? = null,
+    @SerialName("locationLng")
+    val locationLng: Double? = null,
+    @SerialName("locationName")
+    val locationName: String? = null,
     @Deprecated("Obsolete field used for cloud sync. Can't be deleted because of backwards compatibility")
     @SerialName("isSynced")
     val isSynced: Boolean = false,

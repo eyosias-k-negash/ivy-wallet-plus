@@ -10,6 +10,7 @@ import com.ivy.data.model.AccountId
 import com.ivy.data.model.CategoryId
 import com.ivy.data.model.Expense
 import com.ivy.data.model.Income
+import com.ivy.data.model.Location
 import com.ivy.data.model.PositiveValue
 import com.ivy.data.model.TagId
 import com.ivy.data.model.Transaction
@@ -38,7 +39,12 @@ class TransactionMapper @Inject constructor(
             paidForDateTime = paidForDateTime,
             loanId = loanId,
             loanRecordId = loanRecordId,
-            attachmentUrl = attachmentUrl
+            attachmentUrl = attachmentUrl,
+            location = if (locationLat != null && locationLng != null) {
+                Location(lat = locationLat, lng = locationLng, name = locationName)
+            } else {
+                null
+            }
         )
 
         val settled = dateTime != null
@@ -160,6 +166,9 @@ class TransactionMapper @Inject constructor(
             paidForDateTime = metadata.paidForDateTime,
             recurringRuleId = metadata.recurringRuleId,
             attachmentUrl = metadata.attachmentUrl,
+            locationLat = metadata.location?.lat,
+            locationLng = metadata.location?.lng,
+            locationName = metadata.location?.name,
             loanId = metadata.loanId,
             loanRecordId = metadata.loanRecordId,
             isSynced = true,

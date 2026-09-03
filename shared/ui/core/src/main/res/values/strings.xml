@@ -92,7 +92,7 @@
     <string name="confirm_account_change">Confirm Account Change</string>
     <string name="confirm_account_change_description">Note: You are attempting to change the account associated with the loan to an account in a different currency.\nAll loan records will be recalculated based on today’s exchange rates.</string>
     <string name="confirm">Confirm</string>
-    <string name="created_on">Created on</string>
+    <string name="created_on">Created on/at</string>
     <string name="hi">Hi</string>
     <string name="hi_name">Hi %1$s</string>
     <string name="cashflow">Cashflow: %1$s%2$s %3$s</string>
@@ -501,4 +501,10 @@
     <string name="take_photo">Take photo</string>
     <string name="choose_from_gallery">Choose from gallery</string>
     <string name="remove_attachment">Remove attachment</string>
+    <string name="audio_note">Audio note</string>
+    <string name="audio_note_attached">Audio note attached</string>
+    <string name="location">Location</string>
+    <string name="location_attached">Location attached</string>
+    <string name="remove_location">Remove location</string>
+    <string name="msg_turn_on_location">Please turn on your location services</string>
 </resources>
