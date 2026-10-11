@@ -1,13 +1,29 @@
 package com.ivy.wallet.ui.theme.modal.edit
 
+import android.annotation.SuppressLint
+import android.content.Context
+import android.net.Uri
+import android.provider.ContactsContract
+import android.telephony.SubscriptionInfo
+import android.telephony.SubscriptionManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraintsScope
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -23,6 +39,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -42,13 +60,24 @@ import com.ivy.wallet.domain.deprecated.logic.model.CreateAccountData
 import com.ivy.wallet.ui.theme.Gray
 import com.ivy.wallet.ui.theme.Ivy
 import com.ivy.wallet.ui.theme.components.IvyCheckboxWithText
+import com.ivy.wallet.ui.theme.components.IvyIcon
+import com.ivy.wallet.ui.theme.components.IvyOutlinedTextField
 import com.ivy.wallet.ui.theme.modal.ChooseIconModal
 import com.ivy.wallet.ui.theme.modal.CurrencyModal
 import com.ivy.wallet.ui.theme.modal.IvyModal
 import com.ivy.wallet.ui.theme.modal.ModalAddSave
 import com.ivy.wallet.ui.theme.modal.ModalAmountSection
 import com.ivy.wallet.ui.theme.modal.ModalTitle
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.InternalSerializationApi
 import java.util.UUID
+
+private val json = Json {
+    ignoreUnknownKeys = true
+    isLenient = true
+    encodeDefaults = true
+}
 
 @Deprecated("Old design system. Use `:ivy-design` and Material3")
 data class AccountModalData(
@@ -89,13 +118,92 @@ fun BoxWithConstraintsScope.AccountModal(
         mutableStateOf(account?.includeInBalance ?: true)
     }
 
+    var smsAutoListenEnabled by remember(modal) {
+        mutableStateOf(account?.smsAutoListenEnabled ?: false)
+    }
+    var smsSenderPhone by remember(modal) {
+        mutableStateOf(TextFieldValue(account?.smsSenderPhone ?: ""))
+    }
+    var smsSubscriptionIdText by remember(modal) {
+        mutableStateOf(TextFieldValue(account?.smsSubscriptionId?.toString() ?: ""))
+    }
+    var smsReceiverPhoneText by remember(modal) {
+        mutableStateOf(TextFieldValue(account?.smsReceiverPhone ?: ""))
+    }
+    var manualSimEntry by remember(modal) {
+        mutableStateOf(false)
+    }
+    var smsParsingRegex by remember(modal) {
+        mutableStateOf(TextFieldValue(account?.smsParsingRegex ?: com.ivy.legacy.Constants.DEFAULT_SMS_REGEX))
+    }
+    var useMultiRegex by remember(modal) {
+        mutableStateOf(account?.useMultiRegex ?: false)
+    }
+    var smsIncomeRegex by remember(modal) {
+        mutableStateOf(TextFieldValue(account?.smsIncomeRegex ?: ""))
+    }
+    var smsExpenseRegex by remember(modal) {
+        mutableStateOf(TextFieldValue(account?.smsExpenseRegex ?: ""))
+    }
+    var smsAmountRegex by remember(modal) {
+        mutableStateOf(TextFieldValue(account?.smsAmountRegex ?: ""))
+    }
+    var smsDateTimeRegex by remember(modal) {
+        mutableStateOf(TextFieldValue(account?.smsDateTimeRegex ?: ""))
+    }
+    var smsDescriptionRegex by remember(modal) {
+        mutableStateOf(TextFieldValue(account?.smsDescriptionRegex ?: ""))
+    }
+    var smsBalanceRegex by remember(modal) {
+        mutableStateOf(TextFieldValue(account?.smsBalanceRegex ?: ""))
+    }
+
     var amountModalVisible by remember { mutableStateOf(false) }
     var currencyModalVisible by remember { mutableStateOf(false) }
     var chooseIconModalVisible by remember(modal) {
         mutableStateOf(false)
     }
 
+    val context = LocalContext.current
     val forceNonZeroBalance = modal?.forceNonZeroBalance ?: false
+
+    val contactPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickContact(),
+        onResult = { uri ->
+            uri?.let {
+                val name = getContactNameFromUri(context, it)
+                if (name != null) {
+                    smsSenderPhone = TextFieldValue(name)
+                }
+            }
+        }
+    )
+
+    val smsConfigPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+        onResult = { uri ->
+            uri?.let {
+                try {
+                    context.contentResolver.openInputStream(it)?.use { stream ->
+                        val jsonStr = stream.bufferedReader().readText()
+                        val config = json.decodeFromString<SmsRegexConfig>(jsonStr)
+                        smsParsingRegex = TextFieldValue(config.masterMatch ?: "")
+                        useMultiRegex = config.useMultiRegex
+                        smsIncomeRegex = TextFieldValue(config.incomeRegex ?: "")
+                        smsExpenseRegex = TextFieldValue(config.expenseRegex ?: "")
+                        smsAmountRegex = TextFieldValue(config.amountRegex ?: "")
+                        smsDateTimeRegex = TextFieldValue(config.dateTimeRegex ?: "")
+                        smsDescriptionRegex = TextFieldValue(config.descriptionRegex ?: "")
+                        smsBalanceRegex = TextFieldValue(config.balanceRegex ?: "")
+                        android.widget.Toast.makeText(context, "Config imported successfully!", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    android.widget.Toast.makeText(context, "Failed to import config: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    )
 
     IvyModal(
         id = modal?.id,
@@ -115,6 +223,18 @@ fun BoxWithConstraintsScope.AccountModal(
                     icon = icon,
                     amount = amount,
                     includeInBalance = includeInBalance,
+                    smsAutoListenEnabled = smsAutoListenEnabled,
+                    smsSenderPhone = smsSenderPhone.text,
+                    smsSubscriptionId = smsSubscriptionIdText.text.toIntOrNull(),
+                    smsReceiverPhone = smsReceiverPhoneText.text,
+                    smsParsingRegex = smsParsingRegex.text,
+                    useMultiRegex = useMultiRegex,
+                    smsIncomeRegex = smsIncomeRegex.text,
+                    smsExpenseRegex = smsExpenseRegex.text,
+                    smsAmountRegex = smsAmountRegex.text,
+                    smsDateTimeRegex = smsDateTimeRegex.text,
+                    smsDescriptionRegex = smsDescriptionRegex.text,
+                    smsBalanceRegex = smsBalanceRegex.text,
 
                     onCreateAccount = onCreateAccount,
                     onEditAccount = onEditAccount,
@@ -164,6 +284,177 @@ fun BoxWithConstraintsScope.AccountModal(
             selectedColor = color,
             onColorSelected = { color = it }
         )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        IvyCheckboxWithText(
+            modifier = Modifier
+                .padding(start = 16.dp)
+                .align(Alignment.Start),
+            text = "Auto Listen to SMS",
+            checked = smsAutoListenEnabled
+        ) {
+            smsAutoListenEnabled = it
+        }
+
+        if (smsAutoListenEnabled) {
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Box(
+                modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                IvyOutlinedTextField(
+                    modifier = Modifier.fillMaxWidth(),
+                    value = smsSenderPhone,
+                    hint = "Sender Name or Number",
+                    onValueChanged = { smsSenderPhone = it }
+                )
+                Text(
+                    modifier = Modifier
+                        .padding(end = 24.dp)
+                        .clickable { contactPickerLauncher.launch(null) },
+                    text = "PICK",
+                    style = UI.typo.c.style(color = UI.colors.primary, fontWeight = FontWeight.ExtraBold)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (manualSimEntry) {
+                IvyOutlinedTextField(
+                    modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
+                    value = smsSubscriptionIdText,
+                    hint = "SIM Slot (Subscription ID)",
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    onValueChanged = { smsSubscriptionIdText = it }
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                IvyOutlinedTextField(
+                    modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
+                    value = smsReceiverPhoneText,
+                    hint = "Receiving Phone Number (SIM)",
+                    onValueChanged = { smsReceiverPhoneText = it }
+                )
+                Text(
+                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 4.dp),
+                    text = "Used to verify that the SMS arrived on the correct SIM.",
+                    style = UI.typo.c.style(color = Gray)
+                )
+                Text(
+                    modifier = Modifier
+                        .padding(top = 8.dp)
+                        .clickable { manualSimEntry = false }
+                        .align(Alignment.CenterHorizontally),
+                    text = "Switch to Auto Selection",
+                    style = UI.typo.c.style(color = UI.colors.primary, fontWeight = FontWeight.Bold)
+                )
+            } else {
+                SimSubscriptionPicker(
+                    subId = smsSubscriptionIdText.text.toIntOrNull(),
+                    onSubIdChanged = { subId ->
+                        smsSubscriptionIdText = TextFieldValue(subId?.toString() ?: "")
+                        if (subId != null) {
+                            val phone = getSimPhoneNumber(context, subId)
+                            if (phone.isNotNullOrBlank()) {
+                                smsReceiverPhoneText = TextFieldValue(phone!!)
+                            }
+                        } else {
+                            smsReceiverPhoneText = TextFieldValue("")
+                        }
+                    },
+                    onManualEntryClick = { manualSimEntry = true }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            IvyOutlinedTextField(
+                modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
+                value = smsParsingRegex,
+                hint = if (useMultiRegex) "Master Match Regex" else "SMS Parsing Regex",
+                onValueChanged = { smsParsingRegex = it }
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(end = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                IvyCheckboxWithText(
+                    modifier = Modifier
+                        .padding(start = 16.dp),
+                    text = "Use Advanced Multi-Regex",
+                    checked = useMultiRegex
+                ) {
+                    useMultiRegex = it
+                }
+
+                Text(
+                    modifier = Modifier.clickable { smsConfigPickerLauncher.launch(arrayOf("application/json", "text/*")) },
+                    text = "IMPORT CONFIG",
+                    style = UI.typo.c.style(color = UI.colors.primary, fontWeight = FontWeight.ExtraBold)
+                )
+            }
+
+            if (useMultiRegex) {
+                Spacer(modifier = Modifier.height(16.dp))
+
+                IvyOutlinedTextField(
+                    modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
+                    value = smsIncomeRegex,
+                    hint = "Income Identification Regex",
+                    onValueChanged = { smsIncomeRegex = it }
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                IvyOutlinedTextField(
+                    modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
+                    value = smsExpenseRegex,
+                    hint = "Expense Identification Regex",
+                    onValueChanged = { smsExpenseRegex = it }
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                IvyOutlinedTextField(
+                    modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
+                    value = smsAmountRegex,
+                    hint = "Amount Extraction Regex",
+                    onValueChanged = { smsAmountRegex = it }
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                IvyOutlinedTextField(
+                    modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
+                    value = smsDateTimeRegex,
+                    hint = "Date/Time Extraction Regex",
+                    onValueChanged = { smsDateTimeRegex = it }
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                IvyOutlinedTextField(
+                    modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
+                    value = smsDescriptionRegex,
+                    hint = "Description Extraction Regex",
+                    onValueChanged = { smsDescriptionRegex = it }
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                IvyOutlinedTextField(
+                    modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
+                    value = smsBalanceRegex,
+                    hint = "Balance Extraction Regex",
+                    onValueChanged = { smsBalanceRegex = it }
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.height(40.dp))
 
@@ -221,6 +512,18 @@ fun BoxWithConstraintsScope.AccountModal(
                 icon = icon,
                 amount = newAmount,
                 includeInBalance = includeInBalance,
+                smsAutoListenEnabled = smsAutoListenEnabled,
+                smsSenderPhone = smsSenderPhone.text,
+                smsSubscriptionId = smsSubscriptionIdText.text.toIntOrNull(),
+                smsReceiverPhone = smsReceiverPhoneText.text,
+                smsParsingRegex = smsParsingRegex.text,
+                useMultiRegex = useMultiRegex,
+                smsIncomeRegex = smsIncomeRegex.text,
+                smsExpenseRegex = smsExpenseRegex.text,
+                smsAmountRegex = smsAmountRegex.text,
+                smsDateTimeRegex = smsDateTimeRegex.text,
+                smsDescriptionRegex = smsDescriptionRegex.text,
+                smsBalanceRegex = smsBalanceRegex.text,
 
                 onCreateAccount = onCreateAccount,
                 onEditAccount = onEditAccount,
@@ -229,7 +532,6 @@ fun BoxWithConstraintsScope.AccountModal(
         }
     }
 
-    val context = LocalContext.current
     CurrencyModal(
         title = stringResource(R.string.choose_currency),
         initialCurrency = IvyCurrency.fromCode(currencyCode),
@@ -255,6 +557,147 @@ fun BoxWithConstraintsScope.AccountModal(
     }
 }
 
+private fun getContactNameFromUri(context: Context, contactUri: Uri): String? {
+    return try {
+        val projection = arrayOf(ContactsContract.Contacts.DISPLAY_NAME)
+        context.contentResolver.query(contactUri, projection, null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                cursor.getString(0)
+            } else null
+        }
+    } catch (_: Exception) {
+        null
+    }
+}
+
+@SuppressLint("MissingPermission")
+@Composable
+private fun SimSubscriptionPicker(
+    subId: Int?,
+    onSubIdChanged: (Int?) -> Unit,
+    onManualEntryClick: () -> Unit
+) {
+    val context = LocalContext.current
+    val subscriptionManager = remember {
+        context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
+    }
+    val activeSubscriptions = remember {
+        try {
+            subscriptionManager?.activeSubscriptionInfoList ?: emptyList()
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    var expanded by remember { mutableStateOf(false) }
+
+    val selectedSim = activeSubscriptions.find { it.subscriptionId == subId }
+    val displayText = selectedSim?.let { "${it.displayName} (${it.subscriptionId})" }
+        ?: if (subId != null) "ID: $subId" else "Select SIM Slot"
+
+    Box(
+        modifier = Modifier
+            .padding(horizontal = 16.dp)
+            .fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(UI.shapes.rFull)
+                .border(
+                    width = 2.dp,
+                    color = if (subId == null) UI.colors.gray else UI.colors.primary,
+                    shape = UI.shapes.rFull
+                )
+                .background(UI.colors.primary.copy(alpha = 0.1f), UI.shapes.rFull)
+                .clickable { expanded = true }
+                .padding(vertical = 16.dp, horizontal = 24.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = displayText,
+                style = UI.typo.b2.style(
+                    color = UI.colors.pureInverse,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            )
+            Spacer(Modifier.width(8.dp))
+            IvyIcon(
+                modifier = Modifier.height(12.dp),
+                icon = R.drawable.ic_expandarrow,
+                tint = UI.colors.pureInverse
+            )
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.fillMaxWidth(0.9f)
+        ) {
+            activeSubscriptions.forEach { info ->
+                val phone = getSimPhoneNumber(LocalContext.current, info.subscriptionId)
+                DropdownMenuItem(
+                    text = {
+                        val subText = if (phone.isNotNullOrBlank()) {
+                            "${info.subscriptionId}: ${info.carrierName}|$phone"
+                        } else {
+                            "${info.subscriptionId}: ${info.carrierName}"
+                        }
+                        Column {
+                            Text(text = info.displayName.toString(), fontWeight = FontWeight.Bold)
+                            Text(
+                                text = subText,
+                                style = UI.typo.c.style(color = Gray)
+                            )
+                        }
+                    },
+                    onClick = {
+                        onSubIdChanged(info.subscriptionId)
+                        expanded = false
+                    }
+                )
+            }
+            if (activeSubscriptions.isEmpty()) {
+                DropdownMenuItem(
+                    text = { Text("No SIMs detected") },
+                    onClick = { expanded = false },
+                    enabled = false
+                )
+            }
+            DropdownMenuItem(
+                text = { Text("Clear Selection") },
+                onClick = {
+                    onSubIdChanged(null)
+                    expanded = false
+                }
+            )
+            DropdownMenuItem(
+                text = { Text("Manual Entry") },
+                onClick = {
+                    onManualEntryClick()
+                    expanded = false
+                }
+            )
+        }
+    }
+}
+
+@SuppressLint("MissingPermission")
+private fun getSimPhoneNumber(context: Context, subId: Int): String? {
+    val subscriptionManager = context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
+    return try {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            subscriptionManager?.getPhoneNumber(subId)
+        } else {
+            subscriptionManager?.activeSubscriptionInfoList?.find { it.subscriptionId == subId }?.number
+        }
+    } catch (_: Exception) {
+        null
+    }
+}
+
 private fun save(
     account: Account?,
     nameTextFieldValue: TextFieldValue,
@@ -263,6 +706,18 @@ private fun save(
     icon: String?,
     amount: Double,
     includeInBalance: Boolean,
+    smsAutoListenEnabled: Boolean,
+    smsSenderPhone: String?,
+    smsSubscriptionId: Int?,
+    smsReceiverPhone: String?,
+    smsParsingRegex: String?,
+    useMultiRegex: Boolean,
+    smsIncomeRegex: String?,
+    smsExpenseRegex: String?,
+    smsAmountRegex: String?,
+    smsDateTimeRegex: String?,
+    smsDescriptionRegex: String?,
+    smsBalanceRegex: String?,
 
     onCreateAccount: (CreateAccountData) -> Unit,
     onEditAccount: (Account, balance: Double) -> Unit,
@@ -275,7 +730,19 @@ private fun save(
                 currency = currency,
                 includeInBalance = includeInBalance,
                 icon = icon,
-                color = color.toArgb()
+                color = color.toArgb(),
+                smsAutoListenEnabled = smsAutoListenEnabled,
+                smsSenderPhone = smsSenderPhone,
+                smsSubscriptionId = smsSubscriptionId,
+                smsReceiverPhone = smsReceiverPhone,
+                smsParsingRegex = smsParsingRegex,
+                useMultiRegex = useMultiRegex,
+                smsIncomeRegex = smsIncomeRegex,
+                smsExpenseRegex = smsExpenseRegex,
+                smsAmountRegex = smsAmountRegex,
+                smsDateTimeRegex = smsDateTimeRegex,
+                smsDescriptionRegex = smsDescriptionRegex,
+                smsBalanceRegex = smsBalanceRegex
             ),
             amount
         )
@@ -287,7 +754,19 @@ private fun save(
                 color = color,
                 icon = icon,
                 balance = amount,
-                includeBalance = includeInBalance
+                includeBalance = includeInBalance,
+                smsAutoListenEnabled = smsAutoListenEnabled,
+                smsSenderPhone = smsSenderPhone,
+                smsSubscriptionId = smsSubscriptionId,
+                smsReceiverPhone = smsReceiverPhone,
+                smsParsingRegex = smsParsingRegex,
+                useMultiRegex = useMultiRegex,
+                smsIncomeRegex = smsIncomeRegex,
+                smsExpenseRegex = smsExpenseRegex,
+                smsAmountRegex = smsAmountRegex,
+                smsDateTimeRegex = smsDateTimeRegex,
+                smsDescriptionRegex = smsDescriptionRegex,
+                smsBalanceRegex = smsBalanceRegex
             )
         )
     }
@@ -353,3 +832,16 @@ private fun Preview() {
         }
     }
 }
+
+@OptIn(InternalSerializationApi::class)
+@Serializable
+internal data class SmsRegexConfig(
+    val masterMatch: String? = null,
+    val useMultiRegex: Boolean = false,
+    val incomeRegex: String? = null,
+    val expenseRegex: String? = null,
+    val amountRegex: String? = null,
+    val dateTimeRegex: String? = null,
+    val descriptionRegex: String? = null,
+    val balanceRegex: String? = null
+)

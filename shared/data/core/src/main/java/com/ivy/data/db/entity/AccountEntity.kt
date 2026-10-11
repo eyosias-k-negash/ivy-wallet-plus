@@ -1,6 +1,7 @@
 package com.ivy.data.db.entity
 
 import androidx.annotation.Keep
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.ivy.base.kotlinxserilzation.KSerializerUUID
@@ -25,6 +26,36 @@ data class AccountEntity(
     val orderNum: Double = 0.0,
     @SerialName("includeInBalance")
     val includeInBalance: Boolean = true,
+
+    @SerialName("smsAutoListenEnabled")
+    @ColumnInfo(defaultValue = "0")
+    val smsAutoListenEnabled: Boolean = false,
+    @SerialName("smsSenderPhone")
+    val smsSenderPhone: String? = null,
+    @SerialName("smsSubscriptionId")
+    val smsSubscriptionId: Int? = null,
+    @SerialName("smsReceiverPhone")
+    val smsReceiverPhone: String? = null,
+    @SerialName("smsParsingRegex")
+    val smsParsingRegex: String? = null,
+    @SerialName("useMultiRegex")
+    @ColumnInfo(defaultValue = "0")
+    val useMultiRegex: Boolean = false,
+    @SerialName("smsIncomeRegex")
+    val smsIncomeRegex: String? = null,
+    @SerialName("smsExpenseRegex")
+    val smsExpenseRegex: String? = null,
+    @SerialName("smsAmountRegex")
+    val smsAmountRegex: String? = null,
+    @SerialName("smsDateTimeRegex")
+    val smsDateTimeRegex: String? = null,
+    @SerialName("smsDescriptionRegex")
+    val smsDescriptionRegex: String? = null,
+    @SerialName("smsBalanceRegex")
+    val smsBalanceRegex: String? = null,
+    @SerialName("autoTagId")
+    @Serializable(with = KSerializerUUID::class)
+    val autoTagId: UUID? = null,
 
     @Deprecated("Obsolete field used for cloud sync. Can't be deleted because of backwards compatibility")
     @SerialName("isSynced")
