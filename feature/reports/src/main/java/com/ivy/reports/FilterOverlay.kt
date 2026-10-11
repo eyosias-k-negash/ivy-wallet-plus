@@ -685,41 +685,34 @@ private fun AccountsFilter(
 
     Spacer(Modifier.height(16.dp))
 
-    LazyRow {
-        item {
-            Spacer(Modifier.width(24.dp))
-        }
-
-        items(items = allAccounts) { account ->
-            ListItem(
-                icon = account.icon,
-                defaultIcon = R.drawable.ic_custom_account_s,
-                text = account.name,
-                selectedColor = account.color.toComposeColor().takeIf {
-                    filter?.accounts?.contains(account) == true
-                }
-            ) { selected ->
-                if (selected) {
-                    // remove account
-                    onSetFilter(
-                        nonNullFilter(filter).copy(
-                            accounts = nonNullFilter(filter).accounts.filter { it != account }
-                        )
-                    )
-                } else {
-                    // add account
-                    onSetFilter(
-                        nonNullFilter(filter).copy(
-                            accounts = nonNullFilter(filter).accounts
-                                .plus(account).sortedBy { it.orderNum }
-                        )
-                    )
-                }
+    WrapContentRow(
+        modifier = Modifier.padding(horizontal = 24.dp),
+        items = allAccounts
+    ) { account ->
+        ListItem(
+            icon = account.icon,
+            defaultIcon = R.drawable.ic_custom_account_s,
+            text = account.name,
+            selectedColor = account.color.toComposeColor().takeIf {
+                filter?.accounts?.contains(account) == true
             }
-        }
-
-        item {
-            Spacer(Modifier.width(24.dp))
+        ) { selected ->
+            if (selected) {
+                // remove account
+                onSetFilter(
+                    nonNullFilter(filter).copy(
+                        accounts = nonNullFilter(filter).accounts.filter { it != account }
+                    )
+                )
+            } else {
+                // add account
+                onSetFilter(
+                    nonNullFilter(filter).copy(
+                        accounts = nonNullFilter(filter).accounts
+                            .plus(account).sortedBy { it.orderNum }
+                    )
+                )
+            }
         }
     }
 }
@@ -757,41 +750,34 @@ private fun CategoriesFilter(
 
     Spacer(Modifier.height(16.dp))
 
-    LazyRow {
-        item {
-            Spacer(Modifier.width(24.dp))
-        }
-
-        items(items = allCategories) { category ->
-            ListItem(
-                icon = category.icon?.id,
-                defaultIcon = R.drawable.ic_custom_category_s,
-                text = category.name.value,
-                selectedColor = category.color.value.toComposeColor().takeIf {
-                    filter?.categories?.contains(category) == true
-                }
-            ) { selected ->
-                if (selected) {
-                    // remove category
-                    onSetFilter(
-                        myNonNullFilter.copy(
-                            categories = myNonNullFilter.categories.filter { it != category }
-                        )
-                    )
-                } else {
-                    // add category
-                    onSetFilter(
-                        myNonNullFilter.copy(
-                            categories = myNonNullFilter.categories
-                                .plus(category).sortedBy { it.orderNum }
-                        )
-                    )
-                }
+    WrapContentRow(
+        modifier = Modifier.padding(horizontal = 24.dp),
+        items = allCategories
+    ) { category ->
+        ListItem(
+            icon = category.icon?.id,
+            defaultIcon = R.drawable.ic_custom_category_s,
+            text = category.name.value,
+            selectedColor = category.color.value.toComposeColor().takeIf {
+                filter?.categories?.contains(category) == true
             }
-        }
-
-        item {
-            Spacer(Modifier.width(24.dp))
+        ) { selected ->
+            if (selected) {
+                // remove category
+                onSetFilter(
+                    myNonNullFilter.copy(
+                        categories = myNonNullFilter.categories.filter { it != category }
+                    )
+                )
+            } else {
+                // add category
+                onSetFilter(
+                    myNonNullFilter.copy(
+                        categories = myNonNullFilter.categories
+                            .plus(category).sortedBy { it.orderNum }
+                    )
+                )
+            }
         }
     }
 }
