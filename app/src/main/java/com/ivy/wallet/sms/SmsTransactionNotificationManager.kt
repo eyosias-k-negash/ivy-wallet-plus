@@ -18,41 +18,30 @@ class SmsTransactionNotificationManager @Inject constructor(
     private val notificationService: NotificationService
 ) {
     fun showSmsTransactionNotification(
+        transactionId: UUID,
         amount: Double,
         type: TransactionType,
-        title: String,
-        description: String?,
-        dateTime: Long,
-        accountId: UUID,
-        tagIds: List<UUID>,
         accountName: String
     ) {
         val intent = Intent(context, RootActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            putExtra(RootViewModel.EXTRA_ADD_TRANSACTION_TYPE, type.name)
-            putExtra(RootViewModel.EXTRA_AMOUNT, amount)
-            putExtra(RootViewModel.EXTRA_TITLE, title)
-            if (description != null) {
-                putExtra(RootViewModel.EXTRA_DESCRIPTION, description)
-            }
-            putExtra(RootViewModel.EXTRA_DATE_TIME, dateTime)
-            putExtra(RootViewModel.EXTRA_ACCOUNT_ID, accountId.toString())
-            putExtra(RootViewModel.EXTRA_TAG_IDS, tagIds.map { it.toString() }.toTypedArray())
+            putExtra(RootViewModel.EXTRA_EDIT_TRANSACTION_ID, transactionId.toString())
+            putExtra(RootViewModel.EXTRA_TRANSACTION_TYPE, type.name)
         }
 
         val pendingIntent = PendingIntent.getActivity(
             context,
-            accountId.hashCode(),
+            transactionId.hashCode(),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         val notification = notificationService.defaultIvyNotification(IvyNotificationChannel.SMS_TRANSACTION)
-            .setContentTitle("Transaction detected: $accountName")
-            .setContentText("Tap to add transaction for $amount")
+            .setContentTitle("Transaction created: $accountName")
+            .setContentText("Tap to edit transaction for $amount")
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
 
-        notificationService.showNotification(notification, accountId.hashCode())
+        notificationService.showNotification(notification, transactionId.hashCode())
     }
 }
