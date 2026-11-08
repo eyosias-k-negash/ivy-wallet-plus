@@ -48,6 +48,8 @@ class RootViewModel @Inject constructor(
 
     companion object {
         const val EXTRA_ADD_TRANSACTION_TYPE = "add_transaction_type_extra"
+        const val EXTRA_EDIT_TRANSACTION_ID = "edit_transaction_id_extra"
+        const val EXTRA_TRANSACTION_TYPE = "transaction_type_extra"
         const val EXTRA_AMOUNT = "amount_extra"
         const val EXTRA_TITLE = "title_extra"
         const val EXTRA_DESCRIPTION = "description_extra"
@@ -113,6 +115,32 @@ class RootViewModel @Inject constructor(
 
     @Suppress("SwallowedException")
     private fun handleSpecialStart(intent: Intent): Boolean {
+        val editTrnIdStr = intent.getStringExtra(EXTRA_EDIT_TRANSACTION_ID)
+        if (editTrnIdStr != null) {
+            val transactionId = try {
+                UUID.fromString(editTrnIdStr)
+            } catch (e: IllegalArgumentException) {
+                null
+            }
+            if (transactionId != null) {
+                val trnTypeStr = intent.getStringExtra(EXTRA_TRANSACTION_TYPE)
+                    ?: intent.getStringExtra(EXTRA_ADD_TRANSACTION_TYPE)
+                val trnType = try {
+                    trnTypeStr?.let { TransactionType.valueOf(it) } ?: TransactionType.EXPENSE
+                } catch (e: IllegalArgumentException) {
+                    TransactionType.EXPENSE
+                }
+
+                nav.navigateTo(
+                    EditTransactionScreen(
+                        initialTransactionId = transactionId,
+                        type = trnType
+                    )
+                )
+                return true
+            }
+        }
+
         val addTrnType: TransactionType? = try {
             intent.getSerializableExtra(EXTRA_ADD_TRANSACTION_TYPE) as? TransactionType
                 ?: TransactionType.valueOf(intent.getStringExtra(EXTRA_ADD_TRANSACTION_TYPE) ?: "")

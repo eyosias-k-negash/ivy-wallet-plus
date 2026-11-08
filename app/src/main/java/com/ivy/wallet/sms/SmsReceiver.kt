@@ -11,7 +11,13 @@ import android.provider.Telephony
 import android.telephony.SubscriptionManager
 import android.util.Log
 import com.ivy.base.model.TransactionType
+import com.ivy.data.model.TagId
+import com.ivy.data.model.primitive.AssociationId
 import com.ivy.data.repository.AccountRepository
+import com.ivy.data.repository.TagRepository
+import com.ivy.data.repository.TransactionRepository
+import com.ivy.data.repository.mapper.TransactionMapper
+import com.ivy.legacy.datamodel.temp.toDomain
 import timber.log.Timber
 import com.ivy.legacy.utils.isNotNullOrBlank
 import dagger.hilt.android.AndroidEntryPoint
@@ -19,10 +25,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.math.BigDecimal
 import java.security.MessageDigest
 import java.text.DateFormatSymbols
+import java.time.Instant
 import java.util.Calendar
 import java.util.Locale
+import java.util.UUID
 import java.util.regex.Pattern
 import javax.inject.Inject
 
@@ -33,6 +42,15 @@ class SmsReceiver : BroadcastReceiver() {
 
     @Inject
     lateinit var accountRepository: AccountRepository
+
+    @Inject
+    lateinit var transactionRepository: TransactionRepository
+
+    @Inject
+    lateinit var tagRepository: TagRepository
+
+    @Inject
+    lateinit var transactionMapper: TransactionMapper
 
     @Inject
     lateinit var notificationManager: SmsTransactionNotificationManager
@@ -201,12 +219,12 @@ class SmsReceiver : BroadcastReceiver() {
                 description
             }
 
-            notificationManager.showSmsTransactionNotification(
+            saveTransactionAndNotify(
                 amount = amount,
-                type = transactionType,
+                transactionType = transactionType,
                 title = title,
                 description = finalDescription,
-                dateTime = dateTimeMillis,
+                dateTimeMillis = dateTimeMillis,
                 accountId = matchingAccount.id.value,
                 tagIds = matchingAccount.autoTagId?.let { listOf(it.value) } ?: emptyList(),
                 accountName = matchingAccount.name.value
@@ -220,17 +238,58 @@ class SmsReceiver : BroadcastReceiver() {
             val typePrefix = if (transactionType == TransactionType.INCOME) "IN" else "OUT"
             title = "AUTO $typePrefix ${matchingAccount.name.value} $hash"
 
-            notificationManager.showSmsTransactionNotification(
+            saveTransactionAndNotify(
                 amount = amount,
-                type = transactionType,
+                transactionType = transactionType,
                 title = title,
                 description = null,
-                dateTime = dateTimeMillis,
+                dateTimeMillis = dateTimeMillis,
                 accountId = matchingAccount.id.value,
                 tagIds = matchingAccount.autoTagId?.let { listOf(it.value) } ?: emptyList(),
                 accountName = matchingAccount.name.value
             )
         }
+    }
+
+    private suspend fun saveTransactionAndNotify(
+        amount: Double,
+        transactionType: TransactionType,
+        title: String,
+        description: String?,
+        dateTimeMillis: Long,
+        accountId: UUID,
+        tagIds: List<UUID>,
+        accountName: String
+    ) {
+        val transactionId = UUID.randomUUID()
+        val legacyTransaction = com.ivy.base.legacy.Transaction(
+            id = transactionId,
+            accountId = accountId,
+            type = transactionType,
+            amount = BigDecimal.valueOf(amount),
+            title = title,
+            description = description,
+            dateTime = Instant.ofEpochMilli(dateTimeMillis)
+        )
+
+        val domainTrn = legacyTransaction.toDomain(transactionMapper)
+        domainTrn?.let {
+            transactionRepository.save(it)
+        }
+
+        for (tagId in tagIds) {
+            tagRepository.associateTagToEntity(
+                associationId = AssociationId(transactionId),
+                tagId = TagId(tagId)
+            )
+        }
+
+        notificationManager.showSmsTransactionNotification(
+            transactionId = transactionId,
+            amount = amount,
+            type = transactionType,
+            accountName = accountName
+        )
     }
 
     private fun parseDateTimeGroups(matcher: java.util.regex.Matcher): Long? {
