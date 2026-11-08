@@ -29,6 +29,8 @@ fun ListItem(
     @DrawableRes defaultIcon: Int,
     text: String,
     selectedColor: Color?,
+    modifier: Modifier = Modifier,
+    compact: Boolean = false,
     onClick: (selected: Boolean) -> Unit
 ) {
     val textColor =
@@ -37,11 +39,15 @@ fun ListItem(
     val medium = UI.colors.medium
     val rFull = UI.shapes.rFull
 
+    val startEndPadding = if (compact) 8.dp else 12.dp
+    val textPaddingVertical = if (compact) 5.dp else 10.dp
+    val trailingPadding = if (compact) 10.dp else 24.dp
+
     Row(
-        modifier = Modifier
+        modifier = modifier
             .clip(UI.shapes.rFull)
             .thenIf(selectedColor == null) {
-                border(2.dp, medium, rFull)
+                border(if (compact) 1.5.dp else 2.dp, medium, rFull)
             }
             .thenIf(selectedColor != null) {
                 background(selectedColor!!, rFull)
@@ -53,7 +59,7 @@ fun ListItem(
             ),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(startEndPadding))
 
         ItemIconSDefaultIcon(
             iconName = icon,
@@ -64,16 +70,18 @@ fun ListItem(
         Spacer(Modifier.width(4.dp))
 
         Text(
-            modifier = Modifier.padding(vertical = 10.dp),
+            modifier = Modifier.padding(vertical = textPaddingVertical),
             text = text,
-            style = UI.typo.b2.style(
+            style = (if (compact) UI.typo.c else UI.typo.b2).style(
                 color = textColor,
-                fontWeight = FontWeight.ExtraBold
+                fontWeight = FontWeight.Bold
             )
         )
 
-        Spacer(Modifier.width(24.dp))
+        Spacer(Modifier.width(trailingPadding))
     }
 
-    Spacer(Modifier.width(12.dp))
+    if (!compact) {
+        Spacer(Modifier.width(12.dp))
+    }
 }

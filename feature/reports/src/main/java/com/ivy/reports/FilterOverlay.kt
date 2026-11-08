@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraintsScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -13,11 +14,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -685,33 +685,41 @@ private fun AccountsFilter(
 
     Spacer(Modifier.height(16.dp))
 
-    WrapContentRow(
-        modifier = Modifier.padding(horizontal = 24.dp),
-        items = allAccounts
-    ) { account ->
-        ListItem(
-            icon = account.icon,
-            defaultIcon = R.drawable.ic_custom_account_s,
-            text = account.name,
-            selectedColor = account.color.toComposeColor().takeIf {
-                filter?.accounts?.contains(account) == true
-            }
-        ) { selected ->
-            if (selected) {
-                // remove account
-                onSetFilter(
-                    nonNullFilter(filter).copy(
-                        accounts = nonNullFilter(filter).accounts.filter { it != account }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(max = 160.dp)
+            .verticalScroll(rememberScrollState())
+    ) {
+        WrapContentRow(
+            modifier = Modifier.padding(horizontal = 24.dp),
+            items = allAccounts
+        ) { account ->
+            ListItem(
+                icon = account.icon,
+                defaultIcon = R.drawable.ic_custom_account_s,
+                text = account.name,
+                compact = true,
+                selectedColor = account.color.toComposeColor().takeIf {
+                    filter?.accounts?.contains(account) == true
+                }
+            ) { selected ->
+                if (selected) {
+                    // remove account
+                    onSetFilter(
+                        nonNullFilter(filter).copy(
+                            accounts = nonNullFilter(filter).accounts.filter { it != account }
+                        )
                     )
-                )
-            } else {
-                // add account
-                onSetFilter(
-                    nonNullFilter(filter).copy(
-                        accounts = nonNullFilter(filter).accounts
-                            .plus(account).sortedBy { it.orderNum }
+                } else {
+                    // add account
+                    onSetFilter(
+                        nonNullFilter(filter).copy(
+                            accounts = nonNullFilter(filter).accounts
+                                .plus(account).sortedBy { it.orderNum }
+                        )
                     )
-                )
+                }
             }
         }
     }
@@ -750,33 +758,41 @@ private fun CategoriesFilter(
 
     Spacer(Modifier.height(16.dp))
 
-    WrapContentRow(
-        modifier = Modifier.padding(horizontal = 24.dp),
-        items = allCategories
-    ) { category ->
-        ListItem(
-            icon = category.icon?.id,
-            defaultIcon = R.drawable.ic_custom_category_s,
-            text = category.name.value,
-            selectedColor = category.color.value.toComposeColor().takeIf {
-                filter?.categories?.contains(category) == true
-            }
-        ) { selected ->
-            if (selected) {
-                // remove category
-                onSetFilter(
-                    myNonNullFilter.copy(
-                        categories = myNonNullFilter.categories.filter { it != category }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(max = 160.dp)
+            .verticalScroll(rememberScrollState())
+    ) {
+        WrapContentRow(
+            modifier = Modifier.padding(horizontal = 24.dp),
+            items = allCategories
+        ) { category ->
+            ListItem(
+                icon = category.icon?.id,
+                defaultIcon = R.drawable.ic_custom_category_s,
+                text = category.name.value,
+                compact = true,
+                selectedColor = category.color.value.toComposeColor().takeIf {
+                    filter?.categories?.contains(category) == true
+                }
+            ) { selected ->
+                if (selected) {
+                    // remove category
+                    onSetFilter(
+                        myNonNullFilter.copy(
+                            categories = myNonNullFilter.categories.filter { it != category }
+                        )
                     )
-                )
-            } else {
-                // add category
-                onSetFilter(
-                    myNonNullFilter.copy(
-                        categories = myNonNullFilter.categories
-                            .plus(category).sortedBy { it.orderNum }
+                } else {
+                    // add category
+                    onSetFilter(
+                        myNonNullFilter.copy(
+                            categories = myNonNullFilter.categories
+                                .plus(category).sortedBy { it.orderNum }
+                        )
                     )
-                )
+                }
             }
         }
     }
