@@ -81,6 +81,10 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
 import javax.inject.Inject
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
+import com.ivy.data.model.Location
 
 @Suppress("LargeClass")
 @Stable
@@ -140,6 +144,7 @@ class EditTransactionViewModel @Inject constructor(
 
     private var customExchangeRateState by mutableStateOf(CustomExchangeRateState())
     private var attachmentUrl by mutableStateOf<String?>(null)
+    private var location by mutableStateOf<Location?>(null)
     var cameraTempUri by mutableStateOf<Uri?>(null)
         private set
 
@@ -176,21 +181,65 @@ class EditTransactionViewModel @Inject constructor(
             loadedTransaction = screen.initialTransactionId?.let {
                 trnByIdAct(it)
             } ?: Transaction(
-                accountId = defaultAccountId(
+                accountId = screen.accountId ?: defaultAccountId(
                     screen = screen,
                     accounts = getAccounts
                 ),
                 categoryId = screen.categoryId,
                 type = screen.type,
-                amount = BigDecimal.ZERO,
-                toAmount = BigDecimal.ZERO
+                amount = screen.amount?.toBigDecimal() ?: BigDecimal.ZERO,
+                toAmount = BigDecimal.ZERO,
+                title = screen.title,
+                description = screen.description,
+                dateTime = screen.dateTime?.let { Instant.ofEpochMilli(it) } ?: timeProvider.utcNow()
             )
 
             tags = tagList.await()
-            transactionAssociatedTags =
+            transactionAssociatedTags = if (editMode) {
                 tagRepository.findByAssociatedId(AssociationId(loadedTransaction().id)).map(Tag::id)
                     .toImmutableList()
+            } else {
+                screen.tagIds.map { TagId(it) }.toImmutableList()
+            }
             display(loadedTransaction!!)
+
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    fun captureLocation() {
+        val hasCoarse = androidx.core.content.ContextCompat.checkSelfPermission(
+            context,
+            android.Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+        val hasFine = androidx.core.content.ContextCompat.checkSelfPermission(
+            context,
+            android.Manifest.permission.ACCESS_FINE_LOCATION
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+        if (!hasCoarse && !hasFine) {
+            return
+        }
+
+        val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+        fusedLocationClient.getCurrentLocation(
+            Priority.PRIORITY_HIGH_ACCURACY,
+            CancellationTokenSource().token
+        ).addOnSuccessListener { loc ->
+            if (loc != null) {
+                location = Location(lat = loc.latitude, lng = loc.longitude)
+                saveIfEditMode()
+            } else {
+                viewModelScope.launch {
+                    toaster.show(R.string.msg_turn_on_location)
+                }
+            }
+        }.addOnFailureListener { e ->
+            e.printStackTrace()
+            viewModelScope.launch {
+                toaster.show(R.string.msg_turn_on_location)
+            }
         }
     }
 
@@ -216,7 +265,8 @@ class EditTransactionViewModel @Inject constructor(
             customExchangeRateState = getCustomExchangeRateState(),
             tags = getTags(),
             transactionAssociatedTags = getTransactionAssociatedTags(),
-            attachmentUrl = attachmentUrl
+            attachmentUrl = attachmentUrl,
+            location = location
         )
     }
 
@@ -347,11 +397,33 @@ class EditTransactionViewModel @Inject constructor(
             is EditTransactionViewEvent.UpdateExchangeRate -> updateExchangeRate(event.exRate)
             is EditTransactionViewEvent.TagEvent -> handleTagEvent(event)
             is EditTransactionViewEvent.OnAttachImage -> onAttachImage(event.uri)
+            is EditTransactionViewEvent.OnAttachAudio -> onAttachAudio(event.uri)
             EditTransactionViewEvent.OnRequestCaptureImage -> onRequestCaptureImage()
             is EditTransactionViewEvent.OnImageCaptured -> onImageCaptured(event.success)
             EditTransactionViewEvent.OnViewAttachment -> onViewAttachment()
             EditTransactionViewEvent.OnRemoveAttachment -> onRemoveAttachment()
+            EditTransactionViewEvent.OnRemoveLocation -> onRemoveLocation()
+            EditTransactionViewEvent.OnCaptureLocation -> captureLocation()
+            is EditTransactionViewEvent.OnViewLocation -> onViewLocation(event.location)
         }
+    }
+
+    private fun onViewLocation(location: Location) {
+        val gmmIntentUri = Uri.parse("geo:0,0?q=${location.lat},${location.lng}(${location.name ?: ""})")
+        val mapIntent = Intent(Intent.ACTION_VIEW, gmmIntentUri)
+        mapIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            context.startActivity(mapIntent)
+        } catch (e: Exception) {
+            viewModelScope.launch {
+                toaster.show(R.string.error)
+            }
+        }
+    }
+
+    private fun onRemoveLocation() {
+        location = null
+        saveIfEditMode()
     }
 
     private fun handleTagEvent(event: EditTransactionViewEvent.TagEvent) {
@@ -405,6 +477,15 @@ class EditTransactionViewModel @Inject constructor(
             accountByIdAct(it)
         }
         attachmentUrl = transaction.attachmentUrl
+        location = if (transaction.locationLat != null && transaction.locationLng != null) {
+            Location(
+                lat = transaction.locationLat!!,
+                lng = transaction.locationLng!!,
+                name = transaction.locationName
+            )
+        } else {
+            null
+        }
         category = transaction.categoryId?.let {
             categoryRepository.findById(CategoryId(it))
         }
@@ -744,6 +825,9 @@ class EditTransactionViewModel @Inject constructor(
                     },
                     categoryId = category?.id?.value,
                     attachmentUrl = attachmentUrl,
+                    locationLat = location?.lat,
+                    locationLng = location?.lng,
+                    locationName = location?.name,
                     isSynced = false
                 )
 
@@ -1016,7 +1100,13 @@ class EditTransactionViewModel @Inject constructor(
 
     private fun onAttachImage(uri: Uri) {
         viewModelScope.launch(Dispatchers.IO) {
-            saveAttachment(uri)
+            saveAttachment(uri, "jpg")
+        }
+    }
+
+    private fun onAttachAudio(uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            saveAttachment(uri, "m4a")
         }
     }
 
@@ -1052,8 +1142,14 @@ class EditTransactionViewModel @Inject constructor(
             file
         )
 
+        val mimeType = if (url.endsWith(".m4a", ignoreCase = true) || url.endsWith(".mp3", ignoreCase = true)) {
+            "audio/*"
+        } else {
+            "image/*"
+        }
+
         val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "image/*")
+            setDataAndType(uri, mimeType)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
@@ -1061,11 +1157,17 @@ class EditTransactionViewModel @Inject constructor(
     }
 
     private fun onRemoveAttachment() {
+        attachmentUrl?.let { url ->
+            val file = File(url)
+            if (file.exists()) {
+                file.delete()
+            }
+        }
         attachmentUrl = null
         saveIfEditMode()
     }
 
-    private suspend fun saveAttachment(uri: Uri) {
+    private suspend fun saveAttachment(uri: Uri, extension: String) {
         try {
             val inputStream = context.contentResolver.openInputStream(uri) ?: return
             val attachmentsDir = File(context.filesDir, "attachments")
@@ -1073,7 +1175,15 @@ class EditTransactionViewModel @Inject constructor(
                 attachmentsDir.mkdirs()
             }
 
-            val fileName = "attach_${UUID.randomUUID()}.jpg"
+            // Remove previous attachment file if exists
+            attachmentUrl?.let { url ->
+                val oldFile = File(url)
+                if (oldFile.exists()) {
+                    oldFile.delete()
+                }
+            }
+
+            val fileName = "attach_${UUID.randomUUID()}.$extension"
             val file = File(attachmentsDir, fileName)
 
             FileOutputStream(file).use { outputStream ->

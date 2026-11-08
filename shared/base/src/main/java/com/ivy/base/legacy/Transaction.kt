@@ -43,6 +43,10 @@ data class Transaction(
     // This refers to the loan record id that is linked with a transaction
     val loanRecordId: UUID? = null,
 
+    val locationLat: Double? = null,
+    val locationLng: Double? = null,
+    val locationName: String? = null,
+
     val isSynced: Boolean = false,
     val isDeleted: Boolean = false,
 

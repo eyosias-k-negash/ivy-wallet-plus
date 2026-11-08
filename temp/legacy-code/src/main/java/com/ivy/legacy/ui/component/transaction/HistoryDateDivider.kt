@@ -18,10 +18,12 @@ import androidx.compose.ui.unit.dp
 import com.ivy.design.l0_system.UI
 import com.ivy.design.l0_system.style
 import com.ivy.legacy.IvyWalletComponentPreview
+import com.ivy.legacy.utils.clickableNoIndication
 import com.ivy.legacy.utils.dateNowLocal
 import com.ivy.legacy.utils.dateNowUTC
 import com.ivy.legacy.utils.format
 import com.ivy.legacy.utils.formatLocal
+import com.ivy.legacy.utils.rememberInteractionSource
 import com.ivy.ui.R
 import com.ivy.wallet.ui.theme.Gray
 import com.ivy.wallet.ui.theme.Green
@@ -34,13 +36,18 @@ fun HistoryDateDivider(
     spacerTop: Dp,
     baseCurrency: String,
     income: Double,
-    expenses: Double
+    expenses: Double,
+    balance: Double? = null,
+    onClick: () -> Unit = {}
 ) {
     Spacer(Modifier.height(spacerTop))
 
     Row(
         modifier = Modifier
-            .fillMaxWidth(),
+            .fillMaxWidth()
+            .clickableNoIndication(rememberInteractionSource()) {
+                onClick()
+            },
         verticalAlignment = Alignment.CenterVertically
     ) {
         Spacer(Modifier.width(24.dp))
@@ -82,14 +89,24 @@ fun HistoryDateDivider(
 
         Spacer(Modifier.weight(1f))
 
-        val cashflow = income - expenses
-        Text(
-            text = "${cashflow.format(baseCurrency)} $baseCurrency",
-            style = UI.typo.nB2.style(
-                fontWeight = FontWeight.Bold,
-                color = if (cashflow > 0) Green else Gray
+        if (balance != null) {
+            Text(
+                text = "Bal: ${balance.format(baseCurrency)} $baseCurrency",
+                style = UI.typo.nB2.style(
+                    fontWeight = FontWeight.Bold,
+                    color = UI.colors.pureInverse
+                )
             )
-        )
+        } else {
+            val cashflow = income - expenses
+            Text(
+                text = "${cashflow.format(baseCurrency)} $baseCurrency",
+                style = UI.typo.nB2.style(
+                    fontWeight = FontWeight.Bold,
+                    color = if (cashflow > 0) Green else Gray
+                )
+            )
+        }
 
         Spacer(Modifier.width(32.dp))
     }

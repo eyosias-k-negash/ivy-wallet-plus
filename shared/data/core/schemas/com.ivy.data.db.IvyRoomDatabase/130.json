@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 130,
-    "identityHash": "8885cbdff164dda09da8b4a350e43740",
+    "identityHash": "68298d41e1463e38ac0c1d0acc780dd2",
     "entities": [
       {
         "tableName": "accounts",
@@ -74,7 +74,7 @@
       },
       {
         "tableName": "transactions",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`accountId` TEXT NOT NULL, `type` TEXT NOT NULL, `amount` REAL NOT NULL, `toAccountId` TEXT, `toAmount` REAL, `title` TEXT, `description` TEXT, `dateTime` INTEGER, `categoryId` TEXT, `dueDate` INTEGER, `recurringRuleId` TEXT, `paidForDateTime` INTEGER, `attachmentUrl` TEXT, `loanId` TEXT, `loanRecordId` TEXT, `isSynced` INTEGER NOT NULL, `isDeleted` INTEGER NOT NULL, `id` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`accountId` TEXT NOT NULL, `type` TEXT NOT NULL, `amount` REAL NOT NULL, `toAccountId` TEXT, `toAmount` REAL, `title` TEXT, `description` TEXT, `dateTime` INTEGER, `categoryId` TEXT, `dueDate` INTEGER, `recurringRuleId` TEXT, `paidForDateTime` INTEGER, `attachmentUrl` TEXT, `loanId` TEXT, `loanRecordId` TEXT, `locationLat` REAL, `locationLng` REAL, `locationName` TEXT, `isSynced` INTEGER NOT NULL, `isDeleted` INTEGER NOT NULL, `id` TEXT NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "accountId",
@@ -163,6 +163,24 @@
           {
             "fieldPath": "loanRecordId",
             "columnName": "loanRecordId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "locationLat",
+            "columnName": "locationLat",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "locationLng",
+            "columnName": "locationLng",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "locationName",
+            "columnName": "locationName",
             "affinity": "TEXT",
             "notNull": false
           },
@@ -838,7 +856,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '8885cbdff164dda09da8b4a350e43740')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '68298d41e1463e38ac0c1d0acc780dd2')"
     ]
   }
 }

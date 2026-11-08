@@ -1,5 +1,6 @@
 package com.ivy.wallet.ui.theme.components
 
+import android.annotation.SuppressLint
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -22,6 +23,8 @@ import com.ivy.design.l0_system.style
 import com.ivy.legacy.IvyWalletComponentPreview
 import com.ivy.ui.R
 
+@SuppressLint("ComposeModifierMissing")
+@JvmOverloads
 @OptIn(ExperimentalFoundationApi::class)
 @Deprecated("Old design system. Use `:ivy-design` and Material3")
 @Composable

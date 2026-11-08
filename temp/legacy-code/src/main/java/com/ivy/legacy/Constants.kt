@@ -24,4 +24,6 @@ object Constants {
 
     const val URL_GITHUB_SPONSORS =
         "https://github.com/sponsors/Ivy-Apps"
+
+    const val DEFAULT_SMS_REGEX = "(?i)(?:amount|debited|spent|paid|rs\\.?|inr|usd|€|£)\\s*[:\\-\\s]*([0-9,.]+).*?(?:on|at|date)\\s*[:\\-\\s]*([0-9/.\\-]+)\\s*([0-9:]+)"
 }

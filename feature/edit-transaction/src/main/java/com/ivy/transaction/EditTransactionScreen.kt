@@ -1,6 +1,10 @@
 package com.ivy.transaction
 
+import android.app.Activity
+import android.content.Intent
+import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -36,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import com.ivy.base.legacy.Theme
 import com.ivy.base.model.TransactionType
 import com.ivy.data.model.Category
+import com.ivy.data.model.Location
 import com.ivy.data.model.Tag
 import com.ivy.data.model.TagId
 import com.ivy.design.api.LocalTimeConverter
@@ -54,7 +59,6 @@ import com.ivy.legacy.ui.component.tags.ShowTagModal
 import com.ivy.legacy.utils.onScreenStart
 import com.ivy.navigation.EditPlannedScreen
 import com.ivy.navigation.EditTransactionScreen
-import com.ivy.navigation.IvyPreview
 import com.ivy.navigation.navigation
 import com.ivy.navigation.screenScopedViewModel
 import com.ivy.ui.R
@@ -92,18 +96,41 @@ import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.UUID
 import kotlin.math.roundToInt
+import com.google.android.gms.common.api.ResolvableApiException
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.LocationSettingsRequest
+import com.google.android.gms.location.Priority
 
 @ExperimentalFoundationApi
 @Composable
 fun BoxWithConstraintsScope.EditTransactionScreen(screen: EditTransactionScreen) {
     val viewModel: EditTransactionViewModel = screenScopedViewModel()
     val uiState = viewModel.uiState()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     LaunchedEffect(Unit) {
         viewModel.start(screen)
     }
 
     val view = LocalView.current
+
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val granted = permissions.values.any { it }
+        if (granted) {
+            viewModel.onEvent(EditTransactionViewEvent.OnCaptureLocation)
+        }
+    }
+
+    val locationSettingsLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            viewModel.onEvent(EditTransactionViewEvent.OnCaptureLocation)
+        }
+    }
 
     UI(
         screen = screen,
@@ -203,7 +230,56 @@ fun BoxWithConstraintsScope.EditTransactionScreen(screen: EditTransactionScreen)
         onRemoveAttachment = {
             viewModel.onEvent(EditTransactionViewEvent.OnRemoveAttachment)
         },
+        onAttachAudio = {
+            viewModel.onEvent(EditTransactionViewEvent.OnAttachAudio(it))
+        },
+        onCaptureLocation = {
+            val coarse = androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            val fine = androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.ACCESS_FINE_LOCATION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+            if (coarse || fine) {
+                val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000).build()
+                val builder = LocationSettingsRequest.Builder().addLocationRequest(locationRequest)
+                val client = LocationServices.getSettingsClient(context)
+                val task = client.checkLocationSettings(builder.build())
+
+                task.addOnSuccessListener {
+                    viewModel.onEvent(EditTransactionViewEvent.OnCaptureLocation)
+                }
+
+                task.addOnFailureListener { exception ->
+                    if (exception is ResolvableApiException) {
+                        try {
+                            val intentSenderRequest = IntentSenderRequest.Builder(exception.resolution).build()
+                            locationSettingsLauncher.launch(intentSenderRequest)
+                        } catch (sendEx: Exception) {
+                            // Ignore the error.
+                        }
+                    } else {
+                        viewModel.onEvent(EditTransactionViewEvent.OnCaptureLocation)
+                    }
+                }
+            } else {
+                locationPermissionLauncher.launch(
+                    arrayOf(
+                        android.Manifest.permission.ACCESS_COARSE_LOCATION,
+                        android.Manifest.permission.ACCESS_FINE_LOCATION
+                    )
+                )
+            }
+        },
+        onViewLocation = {
+            viewModel.onEvent(EditTransactionViewEvent.OnViewLocation(it))
+        },
+        onRemoveLocation = {
+            viewModel.onEvent(EditTransactionViewEvent.OnRemoveLocation)
+        },
         attachmentUrl = uiState.attachmentUrl,
+        location = uiState.location,
         cameraTempUri = viewModel.cameraTempUri
     )
 }
@@ -256,7 +332,12 @@ private fun BoxWithConstraintsScope.UI(
     onImageCaptured: (Boolean) -> Unit = {},
     onViewAttachment: () -> Unit = {},
     onRemoveAttachment: () -> Unit = {},
+    onAttachAudio: (android.net.Uri) -> Unit = {},
+    onCaptureLocation: () -> Unit = {},
+    onViewLocation: (Location) -> Unit = {},
+    onRemoveLocation: () -> Unit = {},
     attachmentUrl: String? = null,
+    location: Location? = null,
     cameraTempUri: android.net.Uri? = null,
     loanData: EditTransactionDisplayLoan = EditTransactionDisplayLoan(),
     backgroundProcessing: Boolean = false,
@@ -275,6 +356,7 @@ private fun BoxWithConstraintsScope.UI(
     var accountChangeModal by remember { mutableStateOf(false) }
     var showAttachmentOptions by remember { mutableStateOf(false) }
     var showRemoveAttachmentConfirm by remember { mutableStateOf(false) }
+    var showRemoveLocationConfirm by remember { mutableStateOf(false) }
 
     val pickImageLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -286,6 +368,16 @@ private fun BoxWithConstraintsScope.UI(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
         onImageCaptured(success)
+    }
+
+    val recordAudioLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            result.data?.data?.let { uri ->
+                onAttachAudio(uri)
+            }
+        }
     }
 
     val waitModalVisible by remember(backgroundProcessing) {
@@ -429,9 +521,12 @@ private fun BoxWithConstraintsScope.UI(
                 onClick = { showAttachmentOptions = true }
             )
         } else {
+            val isAudio = attachmentUrl.endsWith(".m4a", ignoreCase = true) || 
+                          attachmentUrl.endsWith(".mp3", ignoreCase = true)
+            
             AddPrimaryAttributeButton(
-                icon = R.drawable.ic_attachment,
-                text = stringResource(R.string.image_attached),
+                icon = if (isAudio) R.drawable.ic_vue_media_microphone else R.drawable.ic_attachment,
+                text = stringResource(if (isAudio) R.string.audio_note_attached else R.string.image_attached),
                 onClick = onViewAttachment,
                 onLongClick = { showRemoveAttachmentConfirm = true }
             )
@@ -442,6 +537,10 @@ private fun BoxWithConstraintsScope.UI(
             dueDateTime = dueDate,
             onEditDate = onSetDate,
             onEditTime = onSetTime,
+            location = location,
+            onCaptureLocation = onCaptureLocation,
+            onViewLocation = onViewLocation,
+            onRemoveLocation = { showRemoveLocationConfirm = true }
         )
 
         if (transactionType == TransactionType.TRANSFER && customExchangeRateState.showCard) {
@@ -718,7 +817,7 @@ private fun BoxWithConstraintsScope.UI(
             )
 
             AddPrimaryAttributeButton(
-                icon = R.drawable.ic_attachment,
+                icon = R.drawable.ic_vue_media_photocamera,
                 text = stringResource(R.string.take_photo),
                 onClick = {
                     onRequestCaptureImage()
@@ -730,7 +829,19 @@ private fun BoxWithConstraintsScope.UI(
             Spacer(Modifier.height(12.dp))
 
             AddPrimaryAttributeButton(
-                icon = R.drawable.ic_attachment,
+                icon = R.drawable.ic_vue_media_microphone,
+                text = stringResource(R.string.audio_note),
+                onClick = {
+                    val intent = Intent(MediaStore.Audio.Media.RECORD_SOUND_ACTION)
+                    recordAudioLauncher.launch(intent)
+                    showAttachmentOptions = false
+                }
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            AddPrimaryAttributeButton(
+                icon = R.drawable.ic_vue_media_image,
                 text = stringResource(R.string.choose_from_gallery),
                 onClick = {
                     pickImageLauncher.launch(
@@ -755,6 +866,18 @@ private fun BoxWithConstraintsScope.UI(
             showRemoveAttachmentConfirm = false
         }
     }
+
+    if (showRemoveLocationConfirm) {
+        DeleteModal(
+            visible = showRemoveLocationConfirm,
+            title = stringResource(R.string.remove_location),
+            description = stringResource(R.string.confirm_deletion),
+            dismiss = { showRemoveLocationConfirm = false }
+        ) {
+            onRemoveLocation()
+            showRemoveLocationConfirm = false
+        }
+    }
 }
 
 private fun shouldFocusCategory(
@@ -775,8 +898,9 @@ private val testDateTime = LocalDateTime.of(2023, 4, 27, 0, 35)
 @ExperimentalFoundationApi
 @Preview
 @Composable
-private fun BoxWithConstraintsScope.Preview(isDark: Boolean = false) {
-    IvyPreview(isDark) {
+private fun Preview(isDark: Boolean = false) {
+    val theme = if (isDark) Theme.DARK else Theme.LIGHT
+    IvyWalletPreview(theme) {
         UI(
             screen = EditTransactionScreen(null, TransactionType.EXPENSE),
             initialTitle = "",
