@@ -203,8 +203,6 @@ digraph G {
 ":widget:shared-base" -> ":shared:base"
 ":widget:shared-base" -> ":shared:domain"
 ":ci-actions:compose-stability" -> ":ci-actions:base"
-":ci-actions:issue-assign" -> ":ci-actions:base"
-":ci-actions:issue-create-comment" -> ":ci-actions:base"
 ":shared:data:core-testing" -> ":shared:data:core"
 ":shared:data:model-testing" -> ":shared:data:model"
 ":shared:ui:testing" -> ":shared:ui:core"

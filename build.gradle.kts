@@ -6,8 +6,6 @@ plugins {
     id("ivy.detekt")
     id("com.jraska.module.graph.assertion")
 
-    alias(libs.plugins.gradleWrapperUpgrade)
-
     alias(libs.plugins.koverPlugin)
 }
 
@@ -28,15 +26,6 @@ subprojects {
                     annotatedBy("@Composable")
                 }
             }
-        }
-    }
-}
-
-wrapperUpgrade {
-    gradle {
-        create("ivyWallet") {
-            repo.set("Ivy-Apps/ivy-wallet")
-            baseBranch.set("main")
         }
     }
 }

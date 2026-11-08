@@ -1,177 +1,138 @@
->[!IMPORTANT]
->**🚨 Notice: Project No Longer Maintained 🚨**
->
->As of **Nov 5th, 2024**, this project is no longer maintained by the original developers. No further updates, bug fixes, or support will be provided.
->
->- **Pull Requests and Issues**: We will not be reviewing or merging pull requests, nor responding to issues or discussions.
->
->- **Forking and Future Development**: In accordance with the [GPL-3.0 License](LICENSE), you are encouraged to **fork this repository** to continue development independently. You are free to modify, distribute, and release your own versions under the same license.
->
->- **Disclaimer of Liability**:
->  - **"As-Is" Basis**: This software is provided on an "as-is" basis without any warranties or conditions of any kind, either express or implied.
->  - **No Liability**: The original maintainers shall not be liable for any claims, damages, or other liabilities arising from the use, modification, or distribution of this software.
->  - **User Responsibility**: Users and developers who choose to use or fork this project assume all risks and responsibilities associated with its use and further development.
->
->For more information, please refer to the [LICENSE](LICENSE) file.
+# Ivy Wallet Plus
 
-[![Latest Release](https://img.shields.io/github/v/release/Ivy-Apps/ivy-wallet)](https://github.com/Ivy-Apps/ivy-wallet/releases)
-[![APK](https://github.com/Ivy-Apps/ivy-wallet/actions/workflows/apk.yml/badge.svg)](https://github.com/Ivy-Apps/ivy-wallet/actions/workflows/apk.yml)
-[![Telegram Group](https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/+ETavgioAvWg4NThk)
+[![APK](https://github.com/eyosias-k-negash/ivy-wallet-plus/actions/workflows/apk.yml/badge.svg)](https://github.com/eyosias-k-negash/ivy-wallet-plus/actions/workflows/apk.yml)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![GitHub Repo stars](https://img.shields.io/github/stars/Ivy-Apps/ivy-wallet?style=social)](https://github.com/Ivy-Apps/ivy-wallet/stargazers)
-[![Fork Ivy Wallet](https://img.shields.io/github/forks/Ivy-Apps/ivy-wallet?logo=github&style=social)](https://github.com/Ivy-Apps/ivy-wallet/fork)
+> [!NOTE]
+> **Ivy Wallet Plus is a fork of [Ivy-Apps/ivy-wallet](https://github.com/Ivy-Apps/ivy-wallet).**
+> The original maintainers stopped working on Ivy Wallet on Nov 5th, 2024 and encouraged forks under the GPL-3.0 license. This fork is developed independently, isn't affiliated with Ivy Apps Ltd, and isn't published on the Play Store.
 
-# [Ivy Wallet: money manager](https://play.google.com/store/apps/details?id=com.ivy.wallet)
+Ivy Wallet Plus builds on the Ivy Wallet money manager. It adds:
 
-|                                                                                                            |                                                                                                            |                                                                                                            |                                                                                                            |
-|:----------------------------------------------------------------------------------------------------------:|:----------------------------------------------------------------------------------------------------------:|:----------------------------------------------------------------------------------------------------------:|:----------------------------------------------------------------------------------------------------------:|
+- [Image and audio attachments](#attachments) on transactions
+- [Transactions from bank SMS](#transactions-from-bank-sms), recorded automatically
+- [Locations](#locations) on transactions
+- [Account balance on any day](#account-balance-on-any-day) in an account's history
+- A [tidier reports filter](#reports-filter)
+- The [Ivy Wallet+ name and logo](#ivy-wallet-name-and-logo)
+
+## Attachments
+
+Attach a photo or a voice note, such as a receipt, an invoice or a reminder of what a payment was for, to any expense, income or transfer.
+
+- **Attach:** on the transaction screen, tap **Add attachment**, then choose **Take photo** (camera), **Audio note** (your phone's voice recorder) or **Choose from gallery** (Android photo picker).
+- **View or play:** once something is attached, the button reads **Image attached** or **Audio note attached**. Tap it to open the file in your image viewer or audio player.
+- **Remove:** long-press the button and confirm. The file is deleted too. Each transaction holds one attachment, so remove the current one before adding another.
+- **Spot:** transactions with an attachment show a paperclip next to the amount in transaction lists.
+
+**How it's stored.** The app copies the file into its private storage (`files/attachments/`), so it stays available if you move or delete the original. The transaction keeps the copy's path in the `attachmentUrl` database column. Ivy Wallet's database already had that column but never filled it, so attachments need no migration. When you edit an existing transaction, attaching or removing a file saves right away. On a new transaction, it's saved when you save the transaction.
+
+**Limitations.**
+
+- **Audio note** opens a recorder app through Android's "record sound" request. Not every phone has a recorder that supports it.
+- Backups don't include attachment files. A backup keeps each transaction's file path, so after restoring on another device the paperclip still shows but tapping it says "File not found".
+- Deleting a transaction leaves its attachment file in app storage.
+
+## Transactions from bank SMS
+
+Ivy Wallet Plus can read your bank's SMS alerts and record the transactions for you.
+
+**Set it up** by editing an account:
+
+1. Turn on **Auto Listen to SMS**.
+2. Enter the bank's sender name or number, or tap **PICK** to choose a contact. An SMS counts when its sender, or the sender's contact name, contains this text.
+3. Optionally, choose a **SIM slot** or enter the **receiving phone number**, so only messages that arrive on that SIM count.
+4. Enter an **SMS Parsing Regex**. A message must match it, and its first capture group is read as the amount. If you leave it empty, a generic pattern is used, but you'll usually need one that fits your bank's wording.
+5. Optionally, turn on **Use Advanced Multi-Regex** to use separate patterns, described below. **IMPORT CONFIG** loads all the patterns from a JSON file with any of these keys: `masterMatch`, `useMultiRegex`, `incomeRegex`, `expenseRegex`, `amountRegex`, `dateTimeRegex`, `descriptionRegex` and `balanceRegex`.
+
+| Pattern | What it does |
+|---|---|
+| Income / Expense Identification | If either matches anywhere in the message, it sets the transaction type. |
+| Amount Extraction | The first capture group is the amount. Commas are stripped. |
+| Date/Time Extraction | Capture groups are day, month (a number or an English short name like `Jan`) and year (2 or 4 digits), optionally followed by hour, minute and second. |
+| Description Extraction | Every capture group from every match, one per line. |
+| Balance Extraction | The first capture group is added to the description as `(Bal: …)`. |
+
+Without a type match, or without multi-regex, words like "credited", "received", "deposited" or "added" make the transaction income, and anything else makes it an expense. Without a date match, the transaction is dated when the SMS arrives.
+
+**What happens.** When a matching SMS arrives, the app saves the transaction to that account right away, titled `AUTO IN` or `AUTO OUT` plus the account name and a short code made from the message. It tags it `AUTO-<account name>`, a tag created when you save an account with SMS listening on. A "Transaction created" notification then lets you open the transaction to check or edit it.
+
+**Permissions.** The app doesn't ask for these itself. Allow them in Android's settings under **Apps → Ivy Wallet+ → Permissions**:
+
+- **SMS** is required.
+- **Phone** lets the SIM picker list your SIMs.
+- **Contacts** lets the app match senders by contact name.
+
+## Locations
+
+- **Add:** tap the pin next to the transaction's date and time to save where you are. If needed, the app asks for location permission and to turn location on. It saves coordinates, not a place name.
+- **View:** once a location is saved, the pin is highlighted. Tap it to open the spot in your maps app.
+- **Remove:** long-press the pin and confirm.
+- **Spot:** transactions with a location show a pin next to the amount in transaction lists.
+
+## Account balance on any day
+
+Open an account's transaction list and tap a day's date header. That day and every newer day then show the account's end-of-day balance (`Bal: …`) instead of the day's cash flow. Tap the same day again to switch back.
+
+## Reports filter
+
+In the reports filter, accounts and categories show as compact chips that wrap onto several lines, in a scrollable area of limited height, instead of a single row you scroll sideways.
+
+## Ivy Wallet+ name and logo
+
+The app is called **Ivy Wallet+** and has a new gradient logo. Its package name is `com.ivy.walletplus`, with `.debug` added for debug and demo builds. So it installs alongside the original Ivy Wallet instead of replacing it, and your Ivy Wallet data doesn't move over by itself. To bring it across, export a backup in Ivy Wallet and import it in Ivy Wallet+.
+
+## Install
+
+There are no store releases. Either download the `Ivy-Wallet-Demo.apk` artifact from a recent [APK workflow run](https://github.com/eyosias-k-negash/ivy-wallet-plus/actions/workflows/apk.yml) on `main` (you need to be signed in to GitHub), or build it yourself.
+
+## Build
+
+You need Java 17+ and the latest stable Android Studio.
+
+```bash
+git clone https://github.com/eyosias-k-negash/ivy-wallet-plus.git
+cd ivy-wallet-plus
+./gradlew assembleDemo
+```
+
+The APK is written to `app/build/outputs/apk/demo/app-demo.apk`. Run `./gradlew testDebugUnitTest` for the unit tests. [CI troubleshooting](docs/CI-Troubleshooting.md) explains each CI check and how to run it locally.
+
+## About Ivy Wallet
+
+_A condensed version of the original project's README._
+
+| | | | |
+|:-:|:-:|:-:|:-:|
 | ![1](https://user-images.githubusercontent.com/5564499/189540998-4d6cdcd3-ab4d-40f7-85d4-c82fe8a017d1.png) | ![2](https://user-images.githubusercontent.com/5564499/189541011-1ebbd8b6-50fe-432a-91e2-59206efe99ce.png) | ![3](https://user-images.githubusercontent.com/5564499/189541023-35e7f163-d639-4466-9a91-c56890d5a28e.png) | ![4](https://user-images.githubusercontent.com/5564499/189541027-d352314c-fd5c-43eb-82ad-4aba14c7b0fa.png) |
-| ![5](https://user-images.githubusercontent.com/5564499/189541030-1a0d7948-33af-420b-b126-936d0211c93f.png) | ![6](https://user-images.githubusercontent.com/5564499/189541035-621c4511-5ec7-4d3f-b08e-925d8da95472.png) | ![7](https://user-images.githubusercontent.com/5564499/189541127-7adf5bfa-0652-461c-80f1-076b7179eb6c.png) | ![8](https://user-images.githubusercontent.com/5564499/189541040-7cab633e-be4c-40b2-a2c6-890a15edf805.png) |
 
-Ivy Wallet is a free and open source **money management android app**. It's written using **100% Kotlin and Jetpack Compose**. It's designed to help you keep track of your personal finances with ease.
+Ivy Wallet is a free, open-source money manager for Android, written in 100% Kotlin and Jetpack Compose. It's a manual expense tracker meant to replace a spreadsheet for your personal finances. It helps you answer three questions: how much money you have in total, how much you spent this month and on what, and how much you can spend while still meeting your goals.
 
-Think of Ivy Wallet as a manual expense tracker that tries to replace the good old spreadsheet for managing your finances.
+It doesn't have every feature bigger apps have. Its strengths are its UI and UX, its simplicity and its customization options, which earned it spots in YouTube tech reviewers' ["Top/Best Android App in 2021/2022" charts](https://youtube.com/playlist?list=PLguJN0waG1-eSzKMuFMIULrR3MlqJ3cAE).
 
-**Do you know? Ask yourself.**
+### Tech stack
 
-1) How much money do I have in total?
+- **Core:** [Kotlin](https://kotlinlang.org/), [Jetpack Compose](https://developer.android.com/jetpack/compose), [Material3](https://m3.material.io/), [Coroutines](https://kotlinlang.org/docs/coroutines-overview.html) and [Flow](https://kotlinlang.org/docs/flow.html), [Hilt](https://dagger.dev/hilt/), [Arrow](https://arrow-kt.io/)
+- **Persistence:** [Room](https://developer.android.com/training/data-storage/room), [DataStore](https://developer.android.com/topic/libraries/architecture/datastore)
+- **Networking:** [Ktor client](https://ktor.io/docs/getting-started-ktor-client.html), [kotlinx.serialization](https://github.com/Kotlin/kotlinx.serialization)
+- **Testing:** [JUnit4](https://github.com/junit-team/junit4), [Kotest](https://kotest.io/) assertions, [Paparazzi](https://github.com/cashapp/paparazzi) screenshot tests
+- **Build and CI:** Gradle Kotlin DSL with [convention plugins](https://docs.gradle.org/current/samples/sample_convention_plugins.html) and a [version catalog](https://developer.android.com/build/migrate-to-catalogs), [GitHub Actions](https://github.com/eyosias-k-negash/ivy-wallet-plus/actions)
+- **Linting:** [Detekt](https://github.com/detekt/detekt), [ktlint](https://github.com/pinterest/ktlint), [Slack's compose-lints](https://slackhq.github.io/compose-lints/)
+- **Other:** [Firebase Crashlytics](https://firebase.google.com/products/crashlytics), [Timber](https://github.com/JakeWharton/timber)
 
-2) How much did I spend this month and what did I spend it on?
+### For developers
 
-3) How much can I spend and still meet my financial goals?
+- [Contributing](CONTRIBUTING.md): how to build, check and submit a change to Ivy Wallet Plus.
+- [Developer guidelines](docs/Guidelines.md): architecture, data modeling, error handling and testing conventions.
+- [Learning resources](docs/resources/): books, articles and videos recommended by the original team.
+- [CI troubleshooting](docs/CI-Troubleshooting.md): what each check does and how to fix it.
 
-A money management app can help you answer these questions.
+### Community project
 
-Ivy Wallet may lack some of the features you're looking for, but it truly shines in its user interface and experience, as well as its simplicity and customization options. This was recognized in the ["Top/Best Android App in 2021/2022 charts"](https://youtube.com/playlist?list=PLguJN0waG1-eSzKMuFMIULrR3MlqJ3cAE) by the YouTube tech community.
+The original README lists [ivy-wallet-web](https://github.com/pratikkabade/ivy-wallet-web) by [Pratik Kabade](https://github.com/pratikkabade), which lets you use Ivy Wallet from a web browser. It's developed independently and isn't affiliated with Ivy Apps Ltd or this fork, so use it at your own risk.
 
-<a href='https://play.google.com/store/apps/details?id=com.ivy.wallet&utm_source=github&pcampaignid=pcampaignidMKT-Other-global-all-co-prtnr-py-PartBadge-Mar2515-1'><img alt='Get it on Google Play' src='https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png' width="323" height="125"/></a>
+## Credits and license
 
-> Join our **[private Telegram Community](https://t.me/+ETavgioAvWg4NThk)**.
+Ivy Wallet was created by Ivy Apps Ltd and [its contributors](https://github.com/Ivy-Apps/ivy-wallet/graphs/contributors). Co-founder Stefan Ilijev created the [Ivy design system](https://www.figma.com/file/kSwIa07jcHEHZXo6rzx7dn/Design-System?node-id=0%3A1&mode=dev). Ivy Wallet Plus builds on their work.
 
-> To support our free open source project, please give it a star. ⭐
-> This means a lot to us. Thank you so much! [![GitHub Repo stars](https://img.shields.io/github/stars/Ivy-Apps/ivy-wallet?style=social)](https://github.com/Ivy-Apps/ivy-wallet/stargazers)
-
-## Project Requirements
-
-- Java 17+
-- The **latest stable** Android Studio (for easy install use [JetBrains Toolbox](https://www.jetbrains.com/toolbox-app/))
-
-### Initialize the project
-
-**1. Fork and clone the repo**
-
-Instructions in [CONTRIBUTING.md](./CONTRIBUTING.md).
-
-### Need help?
-
-Join our Telegram community and drop a message in the "Development" topic.
-
-[![Telegram Group](https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/+ETavgioAvWg4NThk)
-
-## Learning Materials
-
-Ivy Wallet is a great place to code and learn. That's why we also link to great learning materials (books, articles, videos), check them out in **[docs/resources 📚](docs/resources/)**.
-
-Make sure to check out our short **[Developer Guidelines 🏗️](docs/Guidelines.md)** to learn more about the technical side of the Ivy Wallet.
-
-## Tech Stack
-
-### Core
-
-- 100% [Kotlin](https://kotlinlang.org/)
-- 100% [Jetpack Compose](https://developer.android.com/jetpack/compose)
-- [Material3 design](https://m3.material.io/) (UI components)
-- [Kotlin Coroutines](https://kotlinlang.org/docs/coroutines-overview.html) (structured concurrency)
-- [Kotlin Flow](https://kotlinlang.org/docs/flow.html) (reactive data stream)
-- [Hilt](https://dagger.dev/hilt/) (DI)
-- [ArrowKt](https://arrow-kt.io/) (functional programming)
-
-
-### Testing
-- [JUnit4](https://github.com/junit-team/junit4) (test framework, compatible with Android)
-- [Kotest](https://kotest.io/) (unit test assertions)
-- [Paparazzi](https://github.com/cashapp/paparazzi) (screenshot testing)
-
-### Local Persistence
-- [DataStore](https://developer.android.com/topic/libraries/architecture/datastore) (key-value storage)
-- [Room DB](https://developer.android.com/training/data-storage/room) (SQLite ORM)
-
-### Networking
-- [Ktor client](https://ktor.io/docs/getting-started-ktor-client.html) (HTTP client)
-- [Kotlinx Serialization](https://github.com/Kotlin/kotlinx.serialization) (JSON serialization)
-
-### Build & CI
-- [Gradle KTS](https://docs.gradle.org/current/userguide/kotlin_dsl.html) (Kotlin DSL)
-- [Gradle convention plugins](https://docs.gradle.org/current/samples/sample_convention_plugins.html) (build logic)
-- [Gradle version catalogs](https://developer.android.com/build/migrate-to-catalogs) (dependencies versions)
-- [GitHub Actions](https://github.com/Ivy-Apps/ivy-wallet/actions) (CI/CD)
-- [Fastlane](https://fastlane.tools/) (uploads the app to the Google Play Store)
-
-### Other
-- [Firebase Crashlytics](https://firebase.google.com/products/crashlytics) (stability monitoring)
-- [Timber](https://github.com/JakeWharton/timber) (logging)
-- [Detekt](https://github.com/detekt/detekt) (linter)
-- [Ktlint](https://github.com/pinterest/ktlint) (linter)
-- [Slack's compose-lints](https://slackhq.github.io/compose-lints/) (linter)
-
-## Contribute
-
-**Want to contribute?** See **[CONTRIBUTING.md](/CONTRIBUTING.md)** [![Fork Ivy Wallet](https://img.shields.io/github/forks/Ivy-Apps/ivy-wallet?logo=github&style=social)](https://github.com/Ivy-Apps/ivy-wallet/fork)
-
-### Contributors Wall:
-
-<a href="https://github.com/ILIYANGERMANOV/ivy-wallet/graphs/contributors">
-  <img alt="contributors graph" src="https://contrib.rocks/image?repo=Ivy-Apps/ivy-wallet" />
-</a>
-<br>
-<br>
-
-_Note: It may take up to 24 hours for the [contrib.rocks](https://contrib.rocks/preview?repo=Ivy-Apps%2Fivy-wallet) plugin to update._ 
-
-**P.S.** You'll also be recognized in a special "Contributors" section. We salute you! 👏
-
-## Creative Contributors
-
-Folks that helped Ivy Wallet in a non-dev creative ways that can't be captured on GitHub.
-
-### Creative Contributors Wall:
-
-<!-- <div align="center">
-  <a href="URL_TO_CONTRIBUTION">
-    <img src="URL_TO_PERSONS_PHOTO" width="100px;" alt="PERSON'S PHOTO"/><br>
-    <strong>USERNAME</strong><br>
-    <small>MESSAGE_FOR_THEIR_CONTRIBUTION</small>
-  </a>
-</div> -->
-
-<div style="text-align: center">
-    <img src="https://avatars.githubusercontent.com/u/62771583?v=4" width="100px;" alt="Stefan Ilijev - Desinger"/><br>
-    <strong>Stefan Ilijev</strong><br>
-    <small>Co-founder and designer of Ivy Wallet. Created the <a href="https://www.figma.com/file/kSwIa07jcHEHZXo6rzx7dn/Design-System?node-id=0%3A1&mode=dev">Ivy design system</a>.</small>
-    <br/>
-    <br/>
-</div>
-
-<div style="text-align: center">
-    <img src="https://avatars.githubusercontent.com/u/86833171?v=4" width="100px;" alt="Aditya [ADX]"/><br>
-    <strong><a href="https://github.com/adx69" >Aditya</a> </strong><br>
-    <br/>
-</div>
-
-<div style="text-align: center">
-    <img src="https://avatars.githubusercontent.com/u/130169485?v=4" width="100px;" alt="Shymom [SSI]"/><br>
-    <strong><a href="https://github.com/SHYMOM" >Shymom</a> </strong><br>
-    <br/>
-</div>
-
-
-## Community Projects
-
-> ⚠️ Disclaimer: The community projects listed are independently developed and not affiliated with Ivy Apps Ltd. Consequently, we cannot vouch for their functionality, security or intentions. Your engagement with these projects is solely at your own discretion and risk. Ivy Apps Ltd explicitly disclaims any warranties, express or implied, and shall not be held liable for any damages or losses resulting from the use of these community-developed projects.
-> 
-### [ivy-wallet-web](https://github.com/pratikkabade/ivy-wallet-web) by [Pratik Kabade](https://github.com/pratikkabade)
-
-This community-developed project allows users to conveniently access Ivy Wallet through their **web browsers**, ensuring a smooth experience across multiple platforms.
-- [GitHub URL](https://github.com/pratikkabade/ivy-wallet-web)
-- [Web app URL](https://ivy-wallet-web.vercel.app/)
+Ivy Wallet Plus is licensed under the [GPL-3.0](LICENSE), like the original. It's provided as is, without warranty of any kind.
