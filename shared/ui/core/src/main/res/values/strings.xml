@@ -499,6 +499,7 @@
     <string name="image_attached">Image attached</string>
     <string name="add_attachment">Add attachment</string>
     <string name="take_photo">Take photo</string>
+    <string name="msg_no_camera_app">No camera app found</string>
     <string name="choose_from_gallery">Choose from gallery</string>
     <string name="remove_attachment">Remove attachment</string>
     <string name="audio_note">Audio note</string>

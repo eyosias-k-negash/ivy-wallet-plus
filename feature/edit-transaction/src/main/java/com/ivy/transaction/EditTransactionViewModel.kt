@@ -145,8 +145,20 @@ class EditTransactionViewModel @Inject constructor(
     private var customExchangeRateState by mutableStateOf(CustomExchangeRateState())
     private var attachmentUrl by mutableStateOf<String?>(null)
     private var location by mutableStateOf<Location?>(null)
-    var cameraTempUri by mutableStateOf<Uri?>(null)
-        private set
+
+    // The camera always writes to the same temp file, so its URI is fixed. Keeping it out of
+    // state means it's ready on the first "Take photo" tap and after process death.
+    // It lives in filesDir, not cacheDir: when storage is low, Android purges app caches every
+    // minute, which can delete the folder while the camera is open and make its write fail.
+    private val cameraTempFile: File
+        get() = File(context.filesDir, "camera_temp/temp_image.jpg")
+    val cameraTempUri: Uri by lazy {
+        androidx.core.content.FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            cameraTempFile
+        )
+    }
 
     private var loadedTransaction: Transaction? = null
     private var editMode = false
@@ -400,6 +412,7 @@ class EditTransactionViewModel @Inject constructor(
             is EditTransactionViewEvent.OnAttachAudio -> onAttachAudio(event.uri)
             EditTransactionViewEvent.OnRequestCaptureImage -> onRequestCaptureImage()
             is EditTransactionViewEvent.OnImageCaptured -> onImageCaptured(event.success)
+            EditTransactionViewEvent.OnCameraUnavailable -> onCameraUnavailable()
             EditTransactionViewEvent.OnViewAttachment -> onViewAttachment()
             EditTransactionViewEvent.OnRemoveAttachment -> onRemoveAttachment()
             EditTransactionViewEvent.OnRemoveLocation -> onRemoveLocation()
@@ -1111,18 +1124,27 @@ class EditTransactionViewModel @Inject constructor(
     }
 
     private fun onRequestCaptureImage() {
-        val tempFile = File(context.cacheDir, "camera_temp/temp_image.jpg")
-        tempFile.parentFile?.mkdirs()
-        cameraTempUri = androidx.core.content.FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.fileprovider",
-            tempFile
-        )
+        // The camera app can't create the directory, and deleting the previous photo stops it
+        // from being attached again if the camera reports success without writing anything.
+        cameraTempFile.parentFile?.mkdirs()
+        cameraTempFile.delete()
     }
 
     private fun onImageCaptured(success: Boolean) {
-        if (success) {
-            cameraTempUri?.let { onAttachImage(it) }
+        // filesDir is never purged, so clean up cancelled or failed captures here
+        if (!success || cameraTempFile.length() == 0L) {
+            cameraTempFile.delete()
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            saveAttachment(cameraTempUri, "jpg")
+            cameraTempFile.delete()
+        }
+    }
+
+    private fun onCameraUnavailable() {
+        viewModelScope.launch {
+            toaster.show(R.string.msg_no_camera_app)
         }
     }
 
