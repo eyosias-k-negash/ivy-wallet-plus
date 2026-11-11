@@ -1,7 +1,9 @@
 package com.ivy.wallet.ui.theme.modal.edit
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.ContactsContract
 import android.telephony.SubscriptionInfo
@@ -44,11 +46,13 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.ivy.design.l0_system.UI
 import com.ivy.design.l0_system.style
 import com.ivy.domain.legacy.ui.IvyColorPicker
 import com.ivy.legacy.IvyWalletPreview
 import com.ivy.legacy.datamodel.Account
+import com.ivy.legacy.sms.SmsParsingRules
 import com.ivy.legacy.utils.isNotNullOrBlank
 import com.ivy.legacy.utils.onScreenStart
 import com.ivy.legacy.utils.selectEndTextFieldValue
@@ -163,6 +167,9 @@ fun BoxWithConstraintsScope.AccountModal(
     var chooseIconModalVisible by remember(modal) {
         mutableStateOf(false)
     }
+    var smsTesterVisible by remember(modal) {
+        mutableStateOf(false)
+    }
 
     val context = LocalContext.current
     val forceNonZeroBalance = modal?.forceNonZeroBalance ?: false
@@ -178,6 +185,31 @@ fun BoxWithConstraintsScope.AccountModal(
             }
         }
     )
+
+    val smsTesterPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions(),
+        onResult = {
+            if (context.hasPermission(Manifest.permission.READ_SMS)) {
+                smsTesterVisible = true
+            } else {
+                android.widget.Toast.makeText(
+                    context,
+                    "Allow SMS access to pick a message to test",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    )
+    val openSmsTester = {
+        // Contacts is optional: it lets the tester match a sender saved as a contact name.
+        val missing = listOf(Manifest.permission.READ_SMS, Manifest.permission.READ_CONTACTS)
+            .filterNot { context.hasPermission(it) }
+        if (missing.isEmpty()) {
+            smsTesterVisible = true
+        } else {
+            smsTesterPermissionLauncher.launch(missing.toTypedArray())
+        }
+    }
 
     val smsConfigPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
@@ -454,6 +486,18 @@ fun BoxWithConstraintsScope.AccountModal(
                     onValueChanged = { smsBalanceRegex = it }
                 )
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .clip(UI.shapes.rFull)
+                    .clickable { openSmsTester() }
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                text = "TEST WITH AN SMS",
+                style = UI.typo.c.style(color = UI.colors.primary, fontWeight = FontWeight.ExtraBold)
+            )
         }
 
         Spacer(modifier = Modifier.height(40.dp))
@@ -555,7 +599,29 @@ fun BoxWithConstraintsScope.AccountModal(
     ) {
         icon = it
     }
+
+    SmsTesterModal(
+        visible = smsTesterVisible,
+        sessionKey = modal,
+        rules = SmsParsingRules(
+            masterRegex = smsParsingRegex.text,
+            useMultiRegex = useMultiRegex,
+            incomeRegex = smsIncomeRegex.text,
+            expenseRegex = smsExpenseRegex.text,
+            amountRegex = smsAmountRegex.text,
+            dateTimeRegex = smsDateTimeRegex.text,
+            descriptionRegex = smsDescriptionRegex.text,
+            balanceRegex = smsBalanceRegex.text,
+        ),
+        senderFilter = smsSenderPhone.text,
+        subscriptionId = smsSubscriptionIdText.text.toIntOrNull(),
+        accountName = nameTextFieldValue.text.trim(),
+        dismiss = { smsTesterVisible = false }
+    )
 }
+
+private fun Context.hasPermission(permission: String): Boolean =
+    ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
 
 private fun getContactNameFromUri(context: Context, contactUri: Uri): String? {
     return try {

@@ -53,11 +53,21 @@ Ivy Wallet Plus can read your bank's SMS alerts and record the transactions for 
 | Description Extraction | Every capture group from every match, one per line. |
 | Balance Extraction | The first capture group is added to the description as `(Bal: …)`. |
 
-Without a type match, or without multi-regex, words like "credited", "received", "deposited" or "added" make the transaction income, and anything else makes it an expense. Without a date match, the transaction is dated when the SMS arrives.
+Without a type match, or without multi-regex, words like "credited", "received", "deposited" or "added" make the transaction income, and anything else makes it an expense. Without a date match, the transaction is dated when the SMS arrives. An empty pattern field is ignored.
+
+Every pattern runs case-insensitive, with `DOTALL` (`.` also matches new lines) and `MULTILINE` (`^` and `$` match at each line). A long SMS that arrives in several parts is read as one message.
+
+**Test your patterns.** Tap **TEST WITH AN SMS**, below the pattern fields, and pick any SMS from your inbox. The tester runs the same parser as the SMS listener, with the values in the form, including edits you haven't saved. It shows:
+
+- whether the sender and SIM checks pass,
+- what each pattern matched and every capture group,
+- the transaction that would be created, or why none would be.
+
+New lines, no-break spaces and other invisible characters show as orange markers. They're often lost when you copy an SMS to a computer, which is why a pattern can work there but fail on the phone. The picked SMS stays selected, so you can edit a pattern and test again. The tester doesn't check the receiving phone number, or whether another account with a matching sender would get the SMS first.
 
 **What happens.** When a matching SMS arrives, the app saves the transaction to that account right away, titled `AUTO IN` or `AUTO OUT` plus the account name and a short code made from the message. It tags it `AUTO-<account name>`, a tag created when you save an account with SMS listening on. A "Transaction created" notification then lets you open the transaction to check or edit it.
 
-**Permissions.** The app doesn't ask for these itself. Allow them in Android's settings under **Apps → Ivy Wallet+ → Permissions**:
+**Permissions.** The tester asks for SMS and Contacts access when you open it. Otherwise the app doesn't ask for these itself, so allow them in Android's settings under **Apps → Ivy Wallet+ → Permissions**:
 
 - **SMS** is required.
 - **Phone** lets the SIM picker list your SIMs.
