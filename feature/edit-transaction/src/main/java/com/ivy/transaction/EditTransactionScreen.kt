@@ -1,6 +1,7 @@
 package com.ivy.transaction
 
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -224,6 +225,9 @@ fun BoxWithConstraintsScope.EditTransactionScreen(screen: EditTransactionScreen)
         onImageCaptured = {
             viewModel.onEvent(EditTransactionViewEvent.OnImageCaptured(it))
         },
+        onCameraUnavailable = {
+            viewModel.onEvent(EditTransactionViewEvent.OnCameraUnavailable)
+        },
         onViewAttachment = {
             viewModel.onEvent(EditTransactionViewEvent.OnViewAttachment)
         },
@@ -325,11 +329,13 @@ private fun BoxWithConstraintsScope.UI(
     onDelete: () -> Unit,
     onDuplicate: () -> Unit,
     onCreateAccount: (CreateAccountData) -> Unit,
+    cameraTempUri: android.net.Uri,
     onExchangeRateChange: (Double?) -> Unit = { },
     onTagOperation: (EditTransactionViewEvent.TagEvent) -> Unit = {},
     onAttachImage: (android.net.Uri) -> Unit = {},
     onRequestCaptureImage: () -> Unit = {},
     onImageCaptured: (Boolean) -> Unit = {},
+    onCameraUnavailable: () -> Unit = {},
     onViewAttachment: () -> Unit = {},
     onRemoveAttachment: () -> Unit = {},
     onAttachAudio: (android.net.Uri) -> Unit = {},
@@ -338,7 +344,6 @@ private fun BoxWithConstraintsScope.UI(
     onRemoveLocation: () -> Unit = {},
     attachmentUrl: String? = null,
     location: Location? = null,
-    cameraTempUri: android.net.Uri? = null,
     loanData: EditTransactionDisplayLoan = EditTransactionDisplayLoan(),
     backgroundProcessing: Boolean = false,
     hasChanges: Boolean = false,
@@ -821,7 +826,11 @@ private fun BoxWithConstraintsScope.UI(
                 text = stringResource(R.string.take_photo),
                 onClick = {
                     onRequestCaptureImage()
-                    cameraTempUri?.let { takePictureLauncher.launch(it) }
+                    try {
+                        takePictureLauncher.launch(cameraTempUri)
+                    } catch (e: ActivityNotFoundException) {
+                        onCameraUnavailable()
+                    }
                     showAttachmentOptions = false
                 }
             )
@@ -939,7 +948,8 @@ private fun Preview(isDark: Boolean = false) {
             onCreateAccount = { },
             onSetDate = {},
             onSetTime = {},
-            onSetTransactionType = {}
+            onSetTransactionType = {},
+            cameraTempUri = android.net.Uri.EMPTY
         )
     }
 }
