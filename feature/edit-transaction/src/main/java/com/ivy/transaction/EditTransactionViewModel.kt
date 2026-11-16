@@ -410,6 +410,7 @@ class EditTransactionViewModel @Inject constructor(
             is EditTransactionViewEvent.TagEvent -> handleTagEvent(event)
             is EditTransactionViewEvent.OnAttachImage -> onAttachImage(event.uri)
             is EditTransactionViewEvent.OnAttachAudio -> onAttachAudio(event.uri)
+            EditTransactionViewEvent.OnRecorderUnavailable -> onRecorderUnavailable()
             EditTransactionViewEvent.OnRequestCaptureImage -> onRequestCaptureImage()
             is EditTransactionViewEvent.OnImageCaptured -> onImageCaptured(event.success)
             EditTransactionViewEvent.OnCameraUnavailable -> onCameraUnavailable()
@@ -1170,6 +1171,12 @@ class EditTransactionViewModel @Inject constructor(
     private fun onCameraUnavailable() {
         viewModelScope.launch {
             toaster.show(R.string.msg_no_camera_app)
+        }
+    }
+
+    private fun onRecorderUnavailable() {
+        viewModelScope.launch {
+            toaster.show(R.string.msg_no_recorder_app)
         }
     }
 
