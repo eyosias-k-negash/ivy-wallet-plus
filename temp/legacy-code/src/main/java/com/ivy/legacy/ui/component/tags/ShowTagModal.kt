@@ -4,14 +4,19 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraintsScope
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -203,28 +208,35 @@ private fun ColumnScope.TagList(
         }
     }
 
-    WrapContentRow(
+    Box(
         modifier = Modifier
-            .padding(horizontal = 16.dp),
-        horizontalMarginBetweenItems = 12.dp,
-        verticalMarginBetweenRows = 12.dp,
-        items = tagListWithAddNewTag
+            .fillMaxWidth()
+            .heightIn(max = 160.dp)
+            .verticalScroll(rememberScrollState())
     ) {
-        when (it) {
-            is Tag -> {
-                ExistingTag(
-                    tag = it,
-                    selected = selectedTagList.contains(it.id),
-                    onClick = { onTagSelected(it) },
-                    onLongClick = { onTagLongClick(it) },
-                    onDeselect = {
-                        onTagDeSelected(it)
-                    }
-                )
-            }
+        WrapContentRow(
+            modifier = Modifier
+                .padding(horizontal = 16.dp),
+            horizontalMarginBetweenItems = 8.dp,
+            verticalMarginBetweenRows = 8.dp,
+            items = tagListWithAddNewTag
+        ) {
+            when (it) {
+                is Tag -> {
+                    ExistingTag(
+                        tag = it,
+                        selected = selectedTagList.contains(it.id),
+                        onClick = { onTagSelected(it) },
+                        onLongClick = { onTagLongClick(it) },
+                        onDeselect = {
+                            onTagDeSelected(it)
+                        }
+                    )
+                }
 
-            is AddNewTag -> {
-                AddNewTagButton(onClick = onAddNewTag)
+                is AddNewTag -> {
+                    AddNewTagButton(onClick = onAddNewTag)
+                }
             }
         }
     }
@@ -253,7 +265,7 @@ private fun ExistingTag(
                 onLongClick = onLongClick
             )
             .border(
-                width = 2.dp,
+                width = 1.5.dp,
                 color = if (selected) UI.colors.pureInverse else UI.colors.medium,
                 shape = UI.shapes.rFull
             )
@@ -263,7 +275,7 @@ private fun ExistingTag(
             .testTag("choose_category_button"),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Spacer(Modifier.width(if (selected) 12.dp else 8.dp))
+        Spacer(Modifier.width(if (selected) 8.dp else 6.dp))
 
 //        ItemIconSDefaultIcon(
 //            modifier = Modifier
@@ -275,16 +287,16 @@ private fun ExistingTag(
 
         Text(
             modifier = Modifier
-                .padding(vertical = 12.dp)
+                .padding(vertical = 6.dp)
                 .padding(
-                    start = if (selected) 12.dp else 12.dp,
-                    end = if (selected) 20.dp else 24.dp
+                    start = 8.dp,
+                    end = if (selected) 10.dp else 14.dp
                 )
                 .weight(1f, fill = false),
             text = "#${tag.name.value}",
-            style = UI.typo.b2.style(
+            style = UI.typo.c.style(
                 color = if (selected) findContrastTextColor(tagColor) else UI.colors.pureInverse,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.Bold
             ),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -293,7 +305,7 @@ private fun ExistingTag(
         if (selected) {
             val deselectBtnBackground = findContrastTextColor(tagColor)
             IvyCircleButton(
-                modifier = Modifier.size(32.dp),
+                modifier = Modifier.size(24.dp),
                 icon = R.drawable.ic_remove,
                 backgroundGradient = Gradient.solid(deselectBtnBackground),
                 tint = findContrastTextColor(deselectBtnBackground)
@@ -301,7 +313,7 @@ private fun ExistingTag(
                 onDeselect()
             }
 
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(6.dp))
         }
     }
 }
@@ -322,12 +334,12 @@ private fun AddNewTagButton(
         text = stringResource(R.string.add_new),
         backgroundGradient = Gradient.solid(UI.colors.mediumInverse),
         iconStart = R.drawable.ic_plus,
-        textStyle = UI.typo.b2.style(
+        textStyle = UI.typo.c.style(
             color = UI.colors.pureInverse,
             fontWeight = FontWeight.Bold
         ),
         iconTint = UI.colors.pureInverse,
-        padding = 10.dp,
+        padding = 6.dp,
         onClick = onClick
     )
 }
