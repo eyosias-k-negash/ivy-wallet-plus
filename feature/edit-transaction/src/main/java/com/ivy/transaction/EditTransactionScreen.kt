@@ -237,6 +237,9 @@ fun BoxWithConstraintsScope.EditTransactionScreen(screen: EditTransactionScreen)
         onAttachAudio = {
             viewModel.onEvent(EditTransactionViewEvent.OnAttachAudio(it))
         },
+        onRecorderUnavailable = {
+            viewModel.onEvent(EditTransactionViewEvent.OnRecorderUnavailable)
+        },
         onCaptureLocation = {
             val coarse = androidx.core.content.ContextCompat.checkSelfPermission(
                 context, android.Manifest.permission.ACCESS_COARSE_LOCATION
@@ -339,6 +342,7 @@ private fun BoxWithConstraintsScope.UI(
     onViewAttachment: () -> Unit = {},
     onRemoveAttachment: () -> Unit = {},
     onAttachAudio: (android.net.Uri) -> Unit = {},
+    onRecorderUnavailable: () -> Unit = {},
     onCaptureLocation: () -> Unit = {},
     onViewLocation: (Location) -> Unit = {},
     onRemoveLocation: () -> Unit = {},
@@ -842,7 +846,11 @@ private fun BoxWithConstraintsScope.UI(
                 text = stringResource(R.string.audio_note),
                 onClick = {
                     val intent = Intent(MediaStore.Audio.Media.RECORD_SOUND_ACTION)
-                    recordAudioLauncher.launch(intent)
+                    try {
+                        recordAudioLauncher.launch(intent)
+                    } catch (e: ActivityNotFoundException) {
+                        onRecorderUnavailable()
+                    }
                     showAttachmentOptions = false
                 }
             )

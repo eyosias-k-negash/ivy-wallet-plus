@@ -29,7 +29,7 @@ Attach a photo or a voice note, such as a receipt, an invoice or a reminder of w
 
 **Limitations.**
 
-- **Audio note** opens a recorder app through Android's "record sound" request. Not every phone has a recorder that supports it.
+- **Audio note** opens a recorder app through Android's "record sound" request. Not every phone has a recorder that supports it. If yours doesn't, the app says "No voice recorder app found" and nothing is attached.
 - Backups don't include attachment files. A backup keeps each transaction's file path, so after restoring on another device the paperclip still shows but tapping it says "File not found".
 - Deleting a transaction leaves its attachment file in app storage.
 

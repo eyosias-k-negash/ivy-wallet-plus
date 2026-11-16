@@ -67,6 +67,7 @@ sealed interface EditTransactionViewEvent {
 
     data class OnAttachImage(val uri: Uri) : EditTransactionViewEvent
     data class OnAttachAudio(val uri: Uri) : EditTransactionViewEvent
+    data object OnRecorderUnavailable : EditTransactionViewEvent
     data object OnRequestCaptureImage : EditTransactionViewEvent
     data class OnImageCaptured(val success: Boolean) : EditTransactionViewEvent
     data object OnCameraUnavailable : EditTransactionViewEvent
