@@ -860,8 +860,16 @@ class EditTransactionViewModel @Inject constructor(
                     accountsChanged = false
                 }
 
-                loadedTransaction().toDomain(transactionMapper)?.let {
-                    transactionRepo.save(it)
+                loadedTransaction().toDomain(transactionMapper)?.let { transaction ->
+                    transactionRepo.save(transaction)
+
+                    if (!editMode) {
+                        // A new transaction's tags are only kept in memory until it's saved
+                        val associatedId = AssociationId(transaction.id.value)
+                        transactionAssociatedTags.forEach { tagId ->
+                            tagRepository.associateTagToEntity(associatedId, tagId)
+                        }
+                    }
                 }
 
                 refreshWidget(WalletBalanceWidgetReceiver::class.java)
@@ -1041,6 +1049,17 @@ class EditTransactionViewModel @Inject constructor(
     }
 
     private fun associateTagToTransaction(selectedTag: Tag) {
+        if (!editMode) {
+            // A new transaction isn't in the database yet, so keep the selection in memory
+            // and write it in saveInternal(). Reloading the tags from the database here
+            // would drop the ones passed in through the screen, like an account's auto tag.
+            if (selectedTag.id !in transactionAssociatedTags) {
+                transactionAssociatedTags =
+                    (transactionAssociatedTags + selectedTag.id).toImmutableList()
+            }
+            return
+        }
+
         viewModelScope.launch(Dispatchers.IO) {
             val associatedId = AssociationId(loadedTransaction().id)
             tagRepository.associateTagToEntity(associatedId, selectedTag.id)
@@ -1059,6 +1078,11 @@ class EditTransactionViewModel @Inject constructor(
     }
 
     private fun removeTagAssociation(selectedTag: Tag) {
+        if (!editMode) {
+            transactionAssociatedTags = (transactionAssociatedTags - selectedTag.id).toImmutableList()
+            return
+        }
+
         viewModelScope.launch(Dispatchers.IO) {
             val associatedId = AssociationId(loadedTransaction().id)
             tagRepository.removeTagAssociation(associatedId, selectedTag.id)
@@ -1087,6 +1111,7 @@ class EditTransactionViewModel @Inject constructor(
     private fun deleteTag(selectedTag: Tag) {
         viewModelScope.launch(Dispatchers.IO) {
             tagRepository.deleteById(selectedTag.id)
+            transactionAssociatedTags = (transactionAssociatedTags - selectedTag.id).toImmutableList()
             tags = tagRepository.findAll().toImmutableList()
         }
     }
