@@ -27,6 +27,14 @@ enum class IvyNotificationChannel(
         description = "Notifications for transactions detected from SMS.",
         importance = NotificationManager.IMPORTANCE_HIGH,
         bypassDnd = false
+    ),
+    OVERDUE_PAYMENT(
+        channelId = "overdue_payment",
+        channelName = "Overdue planned payments",
+        description = "Daily alerts for planned payments that are past their due date and still unpaid.",
+        importance = NotificationManager.IMPORTANCE_HIGH,
+        // Only takes effect once the user lets the app override Do Not Disturb
+        bypassDnd = true
     );
 
     @SuppressLint("WrongConstant")
@@ -43,7 +51,7 @@ enum class IvyNotificationChannel(
         channel.lightColor = colorPurple
         channel.enableLights(true)
         channel.enableVibration(true)
-        channel.setBypassDnd(false)
+        channel.setBypassDnd(bypassDnd)
         return channel
     }
 }

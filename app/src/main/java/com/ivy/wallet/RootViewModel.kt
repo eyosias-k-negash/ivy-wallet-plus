@@ -12,6 +12,7 @@ import com.ivy.data.db.dao.read.SettingsDao
 import com.ivy.data.repository.LegalRepository
 import com.ivy.frp.test.TestIdlingResource
 import com.ivy.legacy.IvyWalletCtx
+import com.ivy.legacy.notification.OverduePaymentReminderLogic
 import com.ivy.legacy.utils.ioThread
 import com.ivy.legacy.utils.readOnly
 import com.ivy.navigation.DisclaimerScreen
@@ -42,6 +43,7 @@ class RootViewModel @Inject constructor(
     private val settingsDao: SettingsDao,
     private val sharedPrefs: SharedPrefs,
     private val transactionReminderLogic: TransactionReminderLogic,
+    private val overduePaymentReminderLogic: OverduePaymentReminderLogic,
     private val migrationsManager: MigrationsManager,
     private val legalRepo: LegalRepository,
 ) : ViewModel() {
@@ -107,6 +109,12 @@ class RootViewModel @Inject constructor(
     }
 
     private fun navigateOnboardedUser(intent: Intent) {
+        overduePaymentReminderLogic.scheduleReminder()
+        viewModelScope.launch(Dispatchers.IO) {
+            // clear notifications of payments that were settled, edited or deleted meanwhile
+            overduePaymentReminderLogic.refresh()
+        }
+
         if (!handleSpecialStart(intent)) {
             nav.navigateTo(MainScreen)
             transactionReminderLogic.scheduleReminder()

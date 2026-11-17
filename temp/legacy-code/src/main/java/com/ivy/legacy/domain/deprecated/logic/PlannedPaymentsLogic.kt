@@ -17,6 +17,7 @@ import com.ivy.legacy.datamodel.Account
 import com.ivy.legacy.datamodel.PlannedPaymentRule
 import com.ivy.legacy.datamodel.temp.toDomain
 import com.ivy.legacy.datamodel.temp.toLegacyDomain
+import com.ivy.legacy.notification.OverduePaymentReminderLogic
 import com.ivy.legacy.utils.ioThread
 import com.ivy.wallet.domain.deprecated.logic.currency.ExchangeRatesLogic
 import com.ivy.wallet.domain.deprecated.logic.currency.sumByDoublePlannedInBaseCurrency
@@ -33,6 +34,7 @@ class PlannedPaymentsLogic @Inject constructor(
     private val plannedPaymentRuleWriter: WritePlannedPaymentRuleDao,
     private val transactionRepository: TransactionRepository,
     private val timeProvider: TimeProvider,
+    private val overduePaymentReminderLogic: OverduePaymentReminderLogic,
 ) {
     companion object {
         private const val AVG_DAYS_IN_MONTH = 30.436875
@@ -192,6 +194,9 @@ class PlannedPaymentsLogic @Inject constructor(
                 // delete paid oneTime planned payment rules
                 plannedPaymentRuleWriter.deleteById(plannedPaymentRule.id)
             }
+
+            // clear the overdue notification of the paid or skipped payment
+            overduePaymentReminderLogic.refresh()
         }
 
         onUpdateUI(paidTransaction)
@@ -224,6 +229,9 @@ class PlannedPaymentsLogic @Inject constructor(
                 // delete paid oneTime planned payment rules
                 plannedPaymentRuleWriter.deleteById(plannedPaymentRule.id)
             }
+
+            // clear the overdue notification of the paid or skipped payment
+            overduePaymentReminderLogic.refresh()
         }
 
         onUpdateUI(paidTransaction)
@@ -269,6 +277,9 @@ class PlannedPaymentsLogic @Inject constructor(
                     plannedPaymentRuleWriter.deleteById(plannedPaymentRule.id)
                 }
             }
+
+            // clear the overdue notification of the paid or skipped payment
+            overduePaymentReminderLogic.refresh()
         }
 
         onUpdateUI(paidTransactions)
@@ -321,6 +332,9 @@ class PlannedPaymentsLogic @Inject constructor(
                     plannedPaymentRuleWriter.deleteById(plannedPaymentRule.id)
                 }
             }
+
+            // clear the overdue notification of the paid or skipped payment
+            overduePaymentReminderLogic.refresh()
         }
 
         onUpdateUI(paidTransactions)
