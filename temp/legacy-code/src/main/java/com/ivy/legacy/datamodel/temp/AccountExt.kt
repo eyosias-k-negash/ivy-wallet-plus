@@ -25,5 +25,6 @@ fun AccountEntity.toLegacyDomain(): Account = Account(
     smsDescriptionRegex = smsDescriptionRegex,
     smsBalanceRegex = smsBalanceRegex,
     autoTagId = autoTagId,
+    smsCaptureLocation = smsCaptureLocation,
     id = id
 )

@@ -56,6 +56,9 @@ data class AccountEntity(
     @SerialName("autoTagId")
     @Serializable(with = KSerializerUUID::class)
     val autoTagId: UUID? = null,
+    @SerialName("smsCaptureLocation")
+    @ColumnInfo(defaultValue = "1")
+    val smsCaptureLocation: Boolean = true,
 
     @Deprecated("Obsolete field used for cloud sync. Can't be deleted because of backwards compatibility")
     @SerialName("isSynced")
