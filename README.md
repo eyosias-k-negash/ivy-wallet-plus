@@ -13,6 +13,7 @@ Ivy Wallet Plus builds on the Ivy Wallet money manager. It adds:
 - [Transactions from bank SMS](#transactions-from-bank-sms), recorded automatically
 - [Locations](#locations) on transactions
 - [Account balance on any day](#account-balance-on-any-day) in an account's history
+- [Alerts for overdue planned payments](#overdue-planned-payment-alerts)
 - A [tidier reports filter](#reports-filter)
 - The [Ivy Wallet+ name and logo](#ivy-wallet-name-and-logo)
 
@@ -83,6 +84,15 @@ New lines, no-break spaces and other invisible characters show as orange markers
 ## Account balance on any day
 
 Open an account's transaction list and tap a day's date header. That day and every newer day then show the account's end-of-day balance (`Bal: …`) instead of the day's cash flow. Tap the same day again to switch back.
+
+## Overdue planned payment alerts
+
+Every morning at 9:00, the app checks for planned payments that are past their due date and still unpaid. Each one gets its own notification with the amount, the account and how many days late it is. They're bundled together and alert once for the whole bundle. Tap one to open that payment, where **Pay** or **Get** settles it. Tap the bundle to open Home and its Overdue section.
+
+- **Repeats:** the alerts come back each morning until the payment is paid or skipped, even if you swiped them away.
+- **Clears itself:** paying or skipping a payment anywhere in the app removes its notification right away. Opening the app also clears notifications for payments you edited or deleted.
+- **Priority:** the notifications use their own high-importance channel, **Overdue planned payments**, and pop up on screen. To let them through Do Not Disturb, add Ivy Wallet+ to Do Not Disturb's allowed apps, or allow reminders there.
+- **Off switch:** turn them off with **Settings → Show notifications** in the app, which also stops the daily transaction reminder, or turn off just this channel in Android's notification settings for the app.
 
 ## Reports filter
 

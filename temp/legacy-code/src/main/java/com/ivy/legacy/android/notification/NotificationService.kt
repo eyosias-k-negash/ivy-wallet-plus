@@ -31,7 +31,8 @@ class NotificationService @Inject constructor(
 
     fun showNotification(
         notification: NotificationCompat.Builder,
-        notificationId: Int
+        notificationId: Int,
+        tag: String? = null
     ) {
         try {
             val notificationManager =
@@ -41,15 +42,26 @@ class NotificationService @Inject constructor(
             val channel = (notification as IvyNotification).ivyChannel.create(context)
 
             notificationManager.createNotificationChannel(channel)
-            notificationManager.notify(notificationId, notification.build())
+            notificationManager.notify(tag, notificationId, notification.build())
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
-    fun dismissNotification(notificationId: Int) {
+    fun dismissNotification(notificationId: Int, tag: String? = null) {
         val notificationManager =
             context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.cancel(notificationId)
+        notificationManager.cancel(tag, notificationId)
+    }
+
+    /** Tags of this app's notifications with [notificationId] that are still in the shade. */
+    fun shownNotificationTags(notificationId: Int): Set<String> {
+        val notificationManager =
+            context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+                ?: return emptySet()
+        return notificationManager.activeNotifications
+            .filter { it.id == notificationId }
+            .mapNotNull { it.tag }
+            .toSet()
     }
 }
