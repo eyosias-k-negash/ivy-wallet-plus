@@ -37,6 +37,7 @@ import com.ivy.legacy.data.EditTransactionDisplayLoan
 import com.ivy.legacy.datamodel.Account
 import com.ivy.legacy.datamodel.temp.toDomain
 import com.ivy.legacy.domain.deprecated.logic.AccountCreator
+import com.ivy.legacy.sms.SmsReviewQueue
 import com.ivy.legacy.utils.computationThread
 import com.ivy.legacy.utils.ioThread
 import com.ivy.legacy.utils.toLowerCaseLocal
@@ -116,6 +117,7 @@ class EditTransactionViewModel @Inject constructor(
     private val timeConverter: TimeConverter,
     private val timeProvider: TimeProvider,
     private val dateTimePicker: DateTimePicker,
+    private val smsReviewQueue: SmsReviewQueue,
 ) : ComposeViewModel<EditTransactionViewState, EditTransactionViewEvent>() {
 
     private var transactionType by mutableStateOf(TransactionType.EXPENSE)
@@ -404,7 +406,8 @@ class EditTransactionViewModel @Inject constructor(
 
             is EditTransactionViewEvent.OnTitleChanged -> onTitleChanged(event.newTitle)
             is EditTransactionViewEvent.OnToAccountChanged -> onToAccountChanged(event.newAccount)
-            is EditTransactionViewEvent.Save -> save(event.closeScreen)
+            // Only the Save button counts as reviewing an SMS transaction, not edit mode's auto-saves
+            is EditTransactionViewEvent.Save -> save(event.closeScreen, markReviewed = true)
             is EditTransactionViewEvent.SetHasChanges -> setHasChanges(event.hasChangesValue)
             is EditTransactionViewEvent.UpdateExchangeRate -> updateExchangeRate(event.exRate)
             is EditTransactionViewEvent.TagEvent -> handleTagEvent(event)
@@ -722,6 +725,7 @@ class EditTransactionViewModel @Inject constructor(
             ioThread {
                 loadedTransaction?.let {
                     transactionRepo.deleteById(TransactionId(it.id))
+                    smsReviewQueue.markReviewed(it.id)
                 }
                 closeScreen()
             }
@@ -803,17 +807,17 @@ class EditTransactionViewModel @Inject constructor(
         }
     }
 
-    private fun save(closeScreen: Boolean = true) {
+    private fun save(closeScreen: Boolean = true, markReviewed: Boolean = false) {
         if (!validTransaction()) {
             return
         }
 
         viewModelScope.launch {
-            saveInternal(closeScreen = closeScreen)
+            saveInternal(closeScreen = closeScreen, markReviewed = markReviewed)
         }
     }
 
-    private suspend fun saveInternal(closeScreen: Boolean) {
+    private suspend fun saveInternal(closeScreen: Boolean, markReviewed: Boolean) {
         try {
             ioThread {
                 val amount = amount.toBigDecimal()
@@ -863,6 +867,9 @@ class EditTransactionViewModel @Inject constructor(
 
                 loadedTransaction().toDomain(transactionMapper)?.let { transaction ->
                     transactionRepo.save(transaction)
+                    if (markReviewed) {
+                        smsReviewQueue.markReviewed(transaction.id.value)
+                    }
 
                     if (!editMode) {
                         // A new transaction's tags are only kept in memory until it's saved
