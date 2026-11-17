@@ -22,6 +22,7 @@ import com.ivy.navigation.OnboardingScreen
 import com.ivy.ui.R
 import com.ivy.wallet.domain.deprecated.logic.notification.TransactionReminderLogic
 import com.ivy.wallet.migrations.MigrationsManager
+import com.ivy.wallet.sms.SmsTransactionNotificationManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -44,6 +45,7 @@ class RootViewModel @Inject constructor(
     private val transactionReminderLogic: TransactionReminderLogic,
     private val migrationsManager: MigrationsManager,
     private val legalRepo: LegalRepository,
+    private val smsNotificationManager: SmsTransactionNotificationManager,
 ) : ViewModel() {
 
     companion object {
@@ -103,6 +105,11 @@ class RootViewModel @Inject constructor(
 
         viewModelScope.launch {
             migrationsManager.executeMigrations()
+        }
+
+        viewModelScope.launch {
+            // A force stop clears the app's notifications, and nothing can run again until it's opened
+            ioThread { smsNotificationManager.restorePendingNotifications() }
         }
     }
 

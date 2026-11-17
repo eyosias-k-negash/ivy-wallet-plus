@@ -18,6 +18,7 @@ import com.ivy.data.repository.mapper.TransactionMapper
 import com.ivy.legacy.datamodel.temp.toDomain
 import com.ivy.legacy.sms.SmsParser
 import com.ivy.legacy.sms.SmsParsingRules
+import com.ivy.legacy.sms.SmsReviewQueue
 import com.ivy.legacy.sms.lookupContactName
 import com.ivy.legacy.utils.isNotNullOrBlank
 import dagger.hilt.android.AndroidEntryPoint
@@ -49,6 +50,9 @@ class SmsReceiver : BroadcastReceiver() {
 
     @Inject
     lateinit var notificationManager: SmsTransactionNotificationManager
+
+    @Inject
+    lateinit var reviewQueue: SmsReviewQueue
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -178,6 +182,7 @@ class SmsReceiver : BroadcastReceiver() {
             )
         }
 
+        reviewQueue.add(transactionId)
         notificationManager.showSmsTransactionNotification(
             transactionId = transactionId,
             amount = amount,

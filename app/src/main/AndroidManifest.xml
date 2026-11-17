@@ -120,6 +120,19 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name="com.ivy.wallet.sms.SmsNotificationRestoreReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name="com.ivy.wallet.sms.SmsNotificationDismissedReceiver"
+            android:exported="false" />
+
         <service
             android:name=".PaymentTileService"
             android:exported="true"
