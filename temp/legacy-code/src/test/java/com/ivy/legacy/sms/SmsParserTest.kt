@@ -9,25 +9,25 @@ import java.time.ZoneId
 
 class SmsParserTest {
 
-    private val body = "Dear Customer your Account 1*****5678 has been debited with ETB 1,250.00 " +
+    private val body = "Example Bank: Account ****1234 debited with USD 1,250.00 " +
         "on 10/11/2026 at 14:05:09 for Payment to ABC Supermarket. " +
-        "Your Current Balance is ETB 8,400.50. Thank you."
+        "Balance is USD 8,400.50."
 
     private val multiRules = SmsParsingRules(
         masterRegex = "debited|credited",
         useMultiRegex = true,
         incomeRegex = "credited",
         expenseRegex = "debited",
-        amountRegex = "ETB\\s*([0-9,.]+)",
+        amountRegex = "USD\\s*([0-9,.]+)",
         dateTimeRegex = "on (\\d{2})/(\\d{2})/(\\d{4}) at (\\d{2}):(\\d{2}):(\\d{2})",
-        descriptionRegex = "for (.+?)\\. Your",
-        balanceRegex = "Balance is ETB ([0-9,]+\\.\\d{2})",
+        descriptionRegex = "for (.+?)\\. Balance",
+        balanceRegex = "Balance is USD ([0-9,]+\\.\\d{2})",
     )
 
     private fun parse(rules: SmsParsingRules, text: String = body) = SmsParser.parse(
         body = text,
         rules = rules,
-        accountName = "CBE",
+        accountName = "Example Bank",
         receivedAtMillis = 0L,
     )
 
@@ -60,12 +60,12 @@ class SmsParserTest {
         val result = parse(multiRules.copy(descriptionRegex = "(Account \\S+)|(ABC \\w+)"))
 
         result.descriptionStep!!.matches.size shouldBe 2
-        result.description shouldBe "Account 1*****5678\nABC Supermarket"
+        result.description shouldBe "Account ****1234\nABC Supermarket"
     }
 
     @Test
     fun `amount falls back to master group 1`() {
-        val result = parse(multiRules.copy(masterRegex = "debited with ETB ([0-9,.]+)", amountRegex = "ETB"))
+        val result = parse(multiRules.copy(masterRegex = "debited with USD ([0-9,.]+)", amountRegex = "USD"))
 
         result.amountSource shouldBe SmsAmountSource.MASTER_REGEX
         result.amount shouldBe 1250.0
@@ -90,7 +90,7 @@ class SmsParserTest {
 
     @Test
     fun `single regex reads the amount from group 1 and the type from keywords`() {
-        val result = parse(SmsParsingRules(masterRegex = "ETB ([0-9,.]+)", useMultiRegex = false))
+        val result = parse(SmsParsingRules(masterRegex = "USD ([0-9,.]+)", useMultiRegex = false))
 
         result.transaction!!.amount shouldBe 1250.0
         result.transaction!!.type shouldBe TransactionType.EXPENSE
@@ -99,9 +99,9 @@ class SmsParserTest {
 
     @Test
     fun `sender filter matches address or contact name`() {
-        SmsParser.senderMatches("cbe", "CBE", null) shouldBe true
-        SmsParser.senderMatches("Bank", "+251911000000", "My Bank") shouldBe true
-        SmsParser.senderMatches("CBE", "Telebirr", null) shouldBe false
-        SmsParser.senderMatches(null, "CBE", null) shouldBe false
+        SmsParser.senderMatches("examplebank", "EXAMPLEBANK", null) shouldBe true
+        SmsParser.senderMatches("Bank", "+15550100000", "My Bank") shouldBe true
+        SmsParser.senderMatches("EXAMPLEBANK", "OtherWallet", null) shouldBe false
+        SmsParser.senderMatches(null, "EXAMPLEBANK", null) shouldBe false
     }
 }
