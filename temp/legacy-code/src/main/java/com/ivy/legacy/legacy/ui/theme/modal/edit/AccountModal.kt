@@ -52,6 +52,7 @@ import com.ivy.design.l0_system.style
 import com.ivy.domain.legacy.ui.IvyColorPicker
 import com.ivy.legacy.IvyWalletPreview
 import com.ivy.legacy.datamodel.Account
+import com.ivy.legacy.sms.SmsLocationAccess
 import com.ivy.legacy.sms.SmsParsingRules
 import com.ivy.legacy.utils.isNotNullOrBlank
 import com.ivy.legacy.utils.onScreenStart
@@ -161,6 +162,9 @@ fun BoxWithConstraintsScope.AccountModal(
     var smsBalanceRegex by remember(modal) {
         mutableStateOf(TextFieldValue(account?.smsBalanceRegex ?: ""))
     }
+    var smsCaptureLocation by remember(modal) {
+        mutableStateOf(account?.smsCaptureLocation ?: true)
+    }
 
     var amountModalVisible by remember { mutableStateOf(false) }
     var currencyModalVisible by remember { mutableStateOf(false) }
@@ -173,6 +177,51 @@ fun BoxWithConstraintsScope.AccountModal(
 
     val context = LocalContext.current
     val forceNonZeroBalance = modal?.forceNonZeroBalance ?: false
+
+    var hasSmsLocationAccess by remember(modal) {
+        mutableStateOf(SmsLocationAccess.hasFullAccess(context))
+    }
+    // Android 11+ only grants background location on its own, after foreground location.
+    val backgroundLocationLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { granted ->
+            hasSmsLocationAccess = SmsLocationAccess.hasFullAccess(context)
+            if (!granted) {
+                android.widget.Toast.makeText(
+                    context,
+                    "Choose \"Allow all the time\" so SMS transactions get a location",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    )
+    val foregroundLocationLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions(),
+        onResult = {
+            hasSmsLocationAccess = SmsLocationAccess.hasFullAccess(context)
+            when {
+                !SmsLocationAccess.hasForeground(context) -> android.widget.Toast.makeText(
+                    context,
+                    "Allow location access so SMS transactions get a location",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+
+                !SmsLocationAccess.hasBackground(context) ->
+                    backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+            }
+        }
+    )
+    val requestSmsLocationAccess: () -> Unit = {
+        when {
+            !SmsLocationAccess.hasForeground(context) ->
+                foregroundLocationLauncher.launch(SmsLocationAccess.foregroundPermissions)
+
+            !SmsLocationAccess.hasBackground(context) ->
+                backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+
+            else -> hasSmsLocationAccess = true
+        }
+    }
 
     val contactPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickContact(),
@@ -267,6 +316,7 @@ fun BoxWithConstraintsScope.AccountModal(
                     smsDateTimeRegex = smsDateTimeRegex.text,
                     smsDescriptionRegex = smsDescriptionRegex.text,
                     smsBalanceRegex = smsBalanceRegex.text,
+                    smsCaptureLocation = smsCaptureLocation,
 
                     onCreateAccount = onCreateAccount,
                     onEditAccount = onEditAccount,
@@ -489,6 +539,43 @@ fun BoxWithConstraintsScope.AccountModal(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            IvyCheckboxWithText(
+                modifier = Modifier
+                    .padding(start = 16.dp)
+                    .align(Alignment.Start),
+                text = "Capture Location",
+                checked = smsCaptureLocation
+            ) {
+                smsCaptureLocation = it
+                if (it && !hasSmsLocationAccess) requestSmsLocationAccess()
+            }
+            if (smsCaptureLocation) {
+                Text(
+                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 4.dp),
+                    text = if (hasSmsLocationAccess) {
+                        "Saves where your phone was when the SMS arrived."
+                    } else {
+                        "Saves where your phone was when the SMS arrived. " +
+                            "Needs location access set to \"Allow all the time\"."
+                    },
+                    style = UI.typo.c.style(color = Gray)
+                )
+                if (!hasSmsLocationAccess) {
+                    Text(
+                        modifier = Modifier
+                            .padding(top = 4.dp)
+                            .align(Alignment.CenterHorizontally)
+                            .clip(UI.shapes.rFull)
+                            .clickable { requestSmsLocationAccess() }
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        text = "ALLOW LOCATION ACCESS",
+                        style = UI.typo.c.style(color = UI.colors.primary, fontWeight = FontWeight.ExtraBold)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             Text(
                 modifier = Modifier
                     .align(Alignment.CenterHorizontally)
@@ -568,6 +655,7 @@ fun BoxWithConstraintsScope.AccountModal(
                 smsDateTimeRegex = smsDateTimeRegex.text,
                 smsDescriptionRegex = smsDescriptionRegex.text,
                 smsBalanceRegex = smsBalanceRegex.text,
+                smsCaptureLocation = smsCaptureLocation,
 
                 onCreateAccount = onCreateAccount,
                 onEditAccount = onEditAccount,
@@ -784,6 +872,7 @@ private fun save(
     smsDateTimeRegex: String?,
     smsDescriptionRegex: String?,
     smsBalanceRegex: String?,
+    smsCaptureLocation: Boolean,
 
     onCreateAccount: (CreateAccountData) -> Unit,
     onEditAccount: (Account, balance: Double) -> Unit,
@@ -808,7 +897,8 @@ private fun save(
                 smsAmountRegex = smsAmountRegex,
                 smsDateTimeRegex = smsDateTimeRegex,
                 smsDescriptionRegex = smsDescriptionRegex,
-                smsBalanceRegex = smsBalanceRegex
+                smsBalanceRegex = smsBalanceRegex,
+                smsCaptureLocation = smsCaptureLocation
             ),
             amount
         )
@@ -832,7 +922,8 @@ private fun save(
                 smsAmountRegex = smsAmountRegex,
                 smsDateTimeRegex = smsDateTimeRegex,
                 smsDescriptionRegex = smsDescriptionRegex,
-                smsBalanceRegex = smsBalanceRegex
+                smsBalanceRegex = smsBalanceRegex,
+                smsCaptureLocation = smsCaptureLocation
             )
         )
     }

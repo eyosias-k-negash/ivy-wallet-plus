@@ -40,6 +40,7 @@ data class Account(
     val smsDescriptionRegex: String? = null,
     val smsBalanceRegex: String? = null,
     val autoTagId: UUID? = null,
+    val smsCaptureLocation: Boolean = true,
 
     val id: UUID = UUID.randomUUID()
 ) {
@@ -65,6 +66,7 @@ data class Account(
         smsDescriptionRegex = smsDescriptionRegex,
         smsBalanceRegex = smsBalanceRegex,
         autoTagId = autoTagId,
+        smsCaptureLocation = smsCaptureLocation,
         id = id
     )
 
@@ -94,7 +96,8 @@ data class Account(
                 smsDateTimeRegex = smsDateTimeRegex,
                 smsDescriptionRegex = smsDescriptionRegex,
                 smsBalanceRegex = smsBalanceRegex,
-                autoTagId = autoTagId?.let { com.ivy.data.model.TagId(it) }
+                autoTagId = autoTagId?.let { com.ivy.data.model.TagId(it) },
+                smsCaptureLocation = smsCaptureLocation,
             )
         }
     }

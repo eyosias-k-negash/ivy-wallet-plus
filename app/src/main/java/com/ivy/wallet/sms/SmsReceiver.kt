@@ -9,6 +9,7 @@ import android.provider.Telephony
 import android.telephony.SubscriptionManager
 import android.util.Log
 import com.ivy.base.model.TransactionType
+import com.ivy.data.model.Location
 import com.ivy.data.model.TagId
 import com.ivy.data.model.primitive.AssociationId
 import com.ivy.data.repository.AccountRepository
@@ -53,6 +54,9 @@ class SmsReceiver : BroadcastReceiver() {
 
     @Inject
     lateinit var reviewQueue: SmsReviewQueue
+
+    @Inject
+    lateinit var locationProvider: SmsLocationProvider
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -137,6 +141,12 @@ class SmsReceiver : BroadcastReceiver() {
         }
         Log.i(TAG, "Parsed ${transaction.type} transaction (multi-regex: ${result.useMultiRegex})")
 
+        val location = if (matchingAccount.smsCaptureLocation) {
+            locationProvider.currentLocation()
+        } else {
+            null
+        }
+
         saveTransactionAndNotify(
             amount = transaction.amount,
             transactionType = transaction.type,
@@ -145,7 +155,8 @@ class SmsReceiver : BroadcastReceiver() {
             dateTimeMillis = transaction.dateTimeMillis,
             accountId = matchingAccount.id.value,
             tagIds = matchingAccount.autoTagId?.let { listOf(it.value) } ?: emptyList(),
-            accountName = matchingAccount.name.value
+            accountName = matchingAccount.name.value,
+            location = location,
         )
     }
 
@@ -157,7 +168,8 @@ class SmsReceiver : BroadcastReceiver() {
         dateTimeMillis: Long,
         accountId: UUID,
         tagIds: List<UUID>,
-        accountName: String
+        accountName: String,
+        location: Location?,
     ) {
         val transactionId = UUID.randomUUID()
         val legacyTransaction = com.ivy.base.legacy.Transaction(
@@ -167,7 +179,10 @@ class SmsReceiver : BroadcastReceiver() {
             amount = BigDecimal.valueOf(amount),
             title = title,
             description = description,
-            dateTime = Instant.ofEpochMilli(dateTimeMillis)
+            dateTime = Instant.ofEpochMilli(dateTimeMillis),
+            locationLat = location?.lat,
+            locationLng = location?.lng,
+            locationName = location?.name,
         )
 
         val domainTrn = legacyTransaction.toDomain(transactionMapper)

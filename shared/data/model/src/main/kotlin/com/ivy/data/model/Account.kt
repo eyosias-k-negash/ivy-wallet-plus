@@ -33,4 +33,5 @@ data class Account(
     val smsDescriptionRegex: String? = null,
     val smsBalanceRegex: String? = null,
     val autoTagId: TagId? = null,
+    val smsCaptureLocation: Boolean = true,
 ) : Identifiable<AccountId>, Reorderable

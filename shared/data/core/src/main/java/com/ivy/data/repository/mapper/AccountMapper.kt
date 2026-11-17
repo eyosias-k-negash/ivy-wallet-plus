@@ -42,6 +42,7 @@ class AccountMapper @Inject constructor(
             smsDescriptionRegex = smsDescriptionRegex,
             smsBalanceRegex = smsBalanceRegex,
             autoTagId = autoTagId?.let(::TagId),
+            smsCaptureLocation = smsCaptureLocation,
         )
     }
 
@@ -66,6 +67,7 @@ class AccountMapper @Inject constructor(
             smsDescriptionRegex = smsDescriptionRegex,
             smsBalanceRegex = smsBalanceRegex,
             autoTagId = autoTagId?.value,
+            smsCaptureLocation = smsCaptureLocation,
             id = id.value,
             isSynced = true, // TODO: Delete this
         )

@@ -163,6 +163,7 @@ dependencies {
     implementation(libs.bundles.compose)
     implementation(libs.bundles.activity)
     implementation(libs.bundles.google)
+    implementation(libs.play.services.location)
     implementation(libs.bundles.firebase)
     implementation(libs.datastore)
     implementation(libs.androidx.security)

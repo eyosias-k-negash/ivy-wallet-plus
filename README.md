@@ -45,6 +45,7 @@ Ivy Wallet Plus can read your bank's SMS alerts and record the transactions for 
 3. Optionally, choose a **SIM slot** or enter the **receiving phone number**, so only messages that arrive on that SIM count.
 4. Enter an **SMS Parsing Regex**. A message must match it, and its first capture group is read as the amount. If you leave it empty, a generic pattern is used, but you'll usually need one that fits your bank's wording.
 5. Optionally, turn on **Use Advanced Multi-Regex** to use separate patterns, described below. **IMPORT CONFIG** loads all the patterns from a JSON file with any of these keys: `masterMatch`, `useMultiRegex`, `incomeRegex`, `expenseRegex`, `amountRegex`, `dateTimeRegex`, `descriptionRegex` and `balanceRegex`.
+6. **Capture Location** is on by default. Turn it off if you don't want SMS transactions to record where your phone was. See [Locations](#locations).
 
 | Pattern | What it does |
 |---|---|
@@ -66,13 +67,14 @@ Every pattern runs case-insensitive, with `DOTALL` (`.` also matches new lines) 
 
 New lines, no-break spaces and other invisible characters show as orange markers. They're often lost when you copy an SMS to a computer, which is why a pattern can work there but fail on the phone. The picked SMS stays selected, so you can edit a pattern and test again. The tester doesn't check the receiving phone number, or whether another account with a matching sender would get the SMS first.
 
-**What happens.** When a matching SMS arrives, the app saves the transaction to that account right away, titled `AUTO IN` or `AUTO OUT` plus the account name and a short code made from the message. It tags it `AUTO-<account name>`, a tag created when you save an account with SMS listening on. A "Transaction created" notification then lets you open the transaction to check or edit it.
+**What happens.** When a matching SMS arrives, the app saves the transaction to that account right away, titled `AUTO IN` or `AUTO OUT` plus the account name and a short code made from the message. It tags it `AUTO-<account name>`, a tag created when you save an account with SMS listening on. A "Transaction created" notification then lets you open the transaction to check or edit it. With **Capture Location** on, the transaction also gets the phone's location when the SMS arrived, if one is found within a few seconds.
 
 **Permissions.** The tester asks for SMS and Contacts access when you open it. Otherwise the app doesn't ask for these itself, so allow them in Android's settings under **Apps → Ivy Wallet+ → Permissions**:
 
 - **SMS** is required.
 - **Phone** lets the SIM picker list your SIMs.
 - **Contacts** lets the app match senders by contact name.
+- **Location** set to **Allow all the time** lets **Capture Location** work while the app is closed. Ticking **Capture Location**, or tapping **ALLOW LOCATION ACCESS** below it, asks for this. With **Allow only while using the app**, SMS transactions get a location only when the app is open.
 
 ## Locations
 
@@ -80,6 +82,7 @@ New lines, no-break spaces and other invisible characters show as orange markers
 - **View:** once a location is saved, the pin is highlighted. Tap it to open the spot in your maps app.
 - **Remove:** long-press the pin and confirm.
 - **Spot:** transactions with a location show a pin next to the amount in transaction lists.
+- **From SMS:** transactions recorded from a bank SMS get the phone's location automatically, unless **Capture Location** is off in the account's SMS settings. Location must be on, and it's skipped if no fix is found within a few seconds.
 
 ## Account balance on any day
 
