@@ -1,5 +1,6 @@
 package com.ivy.legacy.legacy.ui.theme.components
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -44,11 +45,14 @@ fun BudgetBattery(
     currency: String,
     expenses: Double,
     budget: Double,
+    planned: Double = 0.0,
     backgroundNotFilled: Color = UI.colors.pure,
     onClick: (() -> Unit)? = null,
 ) {
     if (budget == 0.0) return
-    val percentSpent = expenses / budget
+    val amounts = budgetBatteryAmounts(expenses = expenses, planned = planned, budget = budget)
+    val percentSpent = amounts.percentSpent
+    val percentCommitted = amounts.percentCommitted
 
     val textColor = when {
         percentSpent <= 0.30 -> {
@@ -82,28 +86,26 @@ fun BudgetBattery(
         else -> White
     }
 
+    // Color by spent + planned so the warning shows before the planned payments land
+    val fillColor = percentCommitted.toBudgetFillColor()
+
     Row(
         modifier = modifier
             .fillMaxWidth()
             .clip(UI.shapes.r4)
             .background(backgroundNotFilled)
             .drawBehind {
+                // Planned payments sit as a lighter band right after the spent fill
+                if (planned > 0) {
+                    drawRect(
+                        color = fillColor.copy(alpha = PlannedFillAlpha),
+                        size = size.copy(
+                            width = (size.width * percentCommitted).toFloat()
+                        )
+                    )
+                }
                 drawRect(
-                    color = when {
-                        percentSpent <= 0.25 -> {
-                            Green
-                        }
-
-                        percentSpent <= 0.50 -> {
-                            Ivy
-                        }
-
-                        percentSpent <= 0.75 -> {
-                            Orange
-                        }
-
-                        else -> Red
-                    },
+                    color = fillColor,
                     size = size.copy(
                         width = (size.width * percentSpent).toFloat()
                     )
@@ -120,7 +122,7 @@ fun BudgetBattery(
         Spacer(Modifier.width(16.dp))
 
         IvyIcon(
-            icon = if (percentSpent > 1.0) R.drawable.ic_buffer_exceeded else R.drawable.ic_buffer_ok,
+            icon = if (percentCommitted > 1.0) R.drawable.ic_buffer_exceeded else R.drawable.ic_buffer_ok,
             tint = textColor
         )
 
@@ -128,13 +130,7 @@ fun BudgetBattery(
 
         Column {
             Text(
-                text = when {
-                    percentSpent <= 1 -> {
-                        stringResource(R.string.left_to_spend)
-                    }
-
-                    else -> stringResource(R.string.budget_exceeded_by)
-                },
+                text = stringResource(amounts.headline.textRes()),
                 style = UI.typo.c.style(
                     color = textColor,
                     fontWeight = FontWeight.ExtraBold
@@ -144,7 +140,7 @@ fun BudgetBattery(
             Spacer(Modifier.height(4.dp))
 
             AmountCurrencyB2Row(
-                amount = abs(budget - expenses),
+                amount = amounts.amount,
                 currency = currency,
                 textColor = textColor
             )
@@ -152,7 +148,17 @@ fun BudgetBattery(
             Spacer(Modifier.height(2.dp))
 
             Text(
-                text = "${expenses.format(currency)}/${budget.format(currency)} $currency",
+                text = if (planned > 0) {
+                    stringResource(
+                        R.string.budget_spent_and_planned,
+                        expenses.format(currency),
+                        planned.format(currency),
+                        budget.format(currency),
+                        currency
+                    )
+                } else {
+                    "${expenses.format(currency)}/${budget.format(currency)} $currency"
+                },
                 style = UI.typo.nC.style(
                     fontWeight = FontWeight.ExtraBold,
                     color = captionTextColor
@@ -160,6 +166,65 @@ fun BudgetBattery(
             )
         }
     }
+}
+
+private const val PlannedFillAlpha = 0.35f
+private const val GreenFillMaxPercent = 0.25
+private const val IvyFillMaxPercent = 0.50
+private const val OrangeFillMaxPercent = 0.75
+
+private fun Double.toBudgetFillColor(): Color = when {
+    this <= GreenFillMaxPercent -> Green
+    this <= IvyFillMaxPercent -> Ivy
+    this <= OrangeFillMaxPercent -> Orange
+    else -> Red
+}
+
+internal enum class BudgetBatteryHeadline {
+    LEFT_TO_SPEND,
+    FREE_TO_SPEND,
+    PLANNED_EXCEEDS_BUDGET,
+    BUDGET_EXCEEDED
+}
+
+@StringRes
+private fun BudgetBatteryHeadline.textRes(): Int = when (this) {
+    BudgetBatteryHeadline.LEFT_TO_SPEND -> R.string.left_to_spend
+    BudgetBatteryHeadline.FREE_TO_SPEND -> R.string.free_to_spend
+    BudgetBatteryHeadline.PLANNED_EXCEEDS_BUDGET -> R.string.planned_exceeds_budget_by
+    BudgetBatteryHeadline.BUDGET_EXCEEDED -> R.string.budget_exceeded_by
+}
+
+internal data class BudgetBatteryAmounts(
+    val headline: BudgetBatteryHeadline,
+    val amount: Double,
+    val percentSpent: Double,
+    val percentCommitted: Double
+)
+
+internal fun budgetBatteryAmounts(
+    expenses: Double,
+    planned: Double,
+    budget: Double
+): BudgetBatteryAmounts {
+    val committed = expenses + planned
+    val headline = when {
+        expenses > budget -> BudgetBatteryHeadline.BUDGET_EXCEEDED
+        committed > budget -> BudgetBatteryHeadline.PLANNED_EXCEEDS_BUDGET
+        planned > 0 -> BudgetBatteryHeadline.FREE_TO_SPEND
+        else -> BudgetBatteryHeadline.LEFT_TO_SPEND
+    }
+    return BudgetBatteryAmounts(
+        headline = headline,
+        // Once actual spending is over, the overspend is the number that matters
+        amount = if (headline == BudgetBatteryHeadline.BUDGET_EXCEEDED) {
+            abs(budget - expenses)
+        } else {
+            abs(budget - committed)
+        },
+        percentSpent = expenses / budget,
+        percentCommitted = committed / budget
+    )
 }
 
 @Preview
@@ -336,6 +401,48 @@ private fun Preview_buffer_125() {
                 modifier = Modifier.padding(horizontal = 32.dp),
                 expenses = 5000.0,
                 budget = 2500.0,
+                currency = "BGN"
+            )
+        }
+    }
+}
+
+@Preview
+@Composable
+private fun Preview_planned() {
+    IvyWalletComponentPreview {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(UI.colors.medium),
+            contentAlignment = Alignment.Center
+        ) {
+            BudgetBattery(
+                modifier = Modifier.padding(horizontal = 32.dp),
+                expenses = 2000.0,
+                planned = 3000.0,
+                budget = 10000.0,
+                currency = "BGN"
+            )
+        }
+    }
+}
+
+@Preview
+@Composable
+private fun Preview_planned_exceeds_budget() {
+    IvyWalletComponentPreview {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(UI.colors.medium),
+            contentAlignment = Alignment.Center
+        ) {
+            BudgetBattery(
+                modifier = Modifier.padding(horizontal = 32.dp),
+                expenses = 4500.0,
+                planned = 6000.0,
+                budget = 10000.0,
                 currency = "BGN"
             )
         }

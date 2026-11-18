@@ -281,6 +281,9 @@
     <string name="export_to_csv">Export to CSV</string>
     <string name="left_to_spend">Left to spend</string>
     <string name="budget_exceeded_by">Budget exceeded by</string>
+    <string name="free_to_spend">Free to spend</string>
+    <string name="planned_exceeds_budget_by">Planned exceeds budget by</string>
+    <string name="budget_spent_and_planned">%1$s spent + %2$s planned / %3$s %4$s</string>
     <string name="buffer_exceeded_by">Buffer exceeded by</string>
     <string name="set_transaction_type">Choose transaction type</string>
     <string name="transfer">Transfer</string>
