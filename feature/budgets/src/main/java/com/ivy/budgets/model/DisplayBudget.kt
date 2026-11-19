@@ -7,7 +7,8 @@ import com.ivy.wallet.domain.data.Reorderable
 @Immutable
 data class DisplayBudget(
     val budget: Budget,
-    val spentAmount: Double
+    val spentAmount: Double,
+    val plannedAmount: Double
 ) : Reorderable {
     override fun getItemOrderNum(): Double {
         return budget.orderId

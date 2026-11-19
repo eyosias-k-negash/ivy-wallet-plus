@@ -34,6 +34,7 @@ import com.ivy.wallet.domain.action.account.AccountsAct
 import com.ivy.wallet.domain.action.budget.BudgetsAct
 import com.ivy.wallet.domain.action.exchange.ExchangeAct
 import com.ivy.wallet.domain.action.settings.BaseCurrencyAct
+import com.ivy.wallet.domain.action.transaction.DueTrnsAct
 import com.ivy.wallet.domain.action.transaction.HistoryTrnsAct
 import com.ivy.wallet.domain.deprecated.logic.model.CreateBudgetData
 import com.ivy.wallet.domain.pure.exchange.ExchangeData
@@ -58,6 +59,7 @@ class BudgetViewModel @Inject constructor(
     private val budgetsAct: BudgetsAct,
     private val baseCurrencyAct: BaseCurrencyAct,
     private val historyTrnsAct: HistoryTrnsAct,
+    private val dueTrnsAct: DueTrnsAct,
     private val exchangeAct: ExchangeAct,
     private val timeProvider: TimeProvider,
     private val timeConverter: TimeConverter,
@@ -201,12 +203,22 @@ class BudgetViewModel @Inject constructor(
                 .sumOf { it.amount }
 
             this@BudgetViewModel.budgets.value = com.ivy.legacy.utils.ioThread {
+                val closedTimeRange = timeRange.toCloseTimeRange()
+                val transactions = historyTrnsAct(closedTimeRange)
+                // Unpaid planned payments due in this period, overdue ones included
+                val plannedTransactions = dueTrnsAct(closedTimeRange).filterNot { it.settled }
                 budgets.map {
                     DisplayBudget(
                         budget = it,
-                        spentAmount = calculateSpentAmount(
+                        spentAmount = calculateExpensesAmount(
                             budget = it,
-                            transactions = historyTrnsAct(timeRange.toCloseTimeRange()),
+                            transactions = transactions,
+                            accounts = accounts,
+                            baseCurrencyCode = baseCurrency
+                        ),
+                        plannedAmount = calculateExpensesAmount(
+                            budget = it,
+                            transactions = plannedTransactions,
                             accounts = accounts,
                             baseCurrencyCode = baseCurrency
                         )
@@ -223,7 +235,7 @@ class BudgetViewModel @Inject constructor(
         }
     }
 
-    private suspend fun calculateSpentAmount(
+    private suspend fun calculateExpensesAmount(
         budget: Budget,
         transactions: List<Transaction>,
         baseCurrencyCode: String,

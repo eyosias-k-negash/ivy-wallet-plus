@@ -14,6 +14,7 @@ Ivy Wallet Plus builds on the Ivy Wallet money manager. It adds:
 - [Locations](#locations) on transactions
 - [Account balance on any day](#account-balance-on-any-day) in an account's history
 - [Alerts for overdue planned payments](#overdue-planned-payment-alerts)
+- [Planned payments in budgets](#planned-payments-in-budgets), shown as a lighter fill
 - A [tidier reports filter](#reports-filter)
 - The [Ivy Wallet+ name and logo](#ivy-wallet-name-and-logo)
 
@@ -96,6 +97,10 @@ Every morning at 9:00, the app checks for planned payments that are past their d
 - **Clears itself:** paying or skipping a payment anywhere in the app removes its notification right away. Opening the app also clears notifications for payments you edited or deleted.
 - **Priority:** the notifications use their own high-importance channel, **Overdue planned payments**, and pop up on screen. To let them through Do Not Disturb, add Ivy Wallet+ to Do Not Disturb's allowed apps, or allow reminders there.
 - **Off switch:** turn them off with **Settings → Show notifications** in the app, which also stops the daily transaction reminder, or turn off just this channel in Android's notification settings for the app.
+
+## Planned payments in budgets
+
+On the Budgets screen, each budget's bar also counts the month's planned expenses that are still unpaid, including overdue ones. What you've spent is the solid fill. Planned payments follow it as a lighter fill, so the empty part is what's free to spend. The bar takes its color from spent plus planned, so it turns orange or red before the payments land. The amount reads **Free to spend**, or **Planned exceeds budget by** when the planned payments would take you over. Once a payment is paid, it moves from the lighter fill to the solid one. Budgets with no planned payments look the same as before.
 
 ## Reports filter
 

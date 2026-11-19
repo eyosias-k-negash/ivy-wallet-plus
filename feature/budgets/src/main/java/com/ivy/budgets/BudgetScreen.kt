@@ -316,6 +316,7 @@ private fun BudgetItem(
         modifier = Modifier.padding(horizontal = 16.dp),
         currency = baseCurrency,
         expenses = displayBudget.spentAmount,
+        planned = displayBudget.plannedAmount,
         budget = displayBudget.budget.amount,
         backgroundNotFilled = UI.colors.medium
     ) {
