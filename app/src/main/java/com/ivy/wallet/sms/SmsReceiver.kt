@@ -106,7 +106,8 @@ class SmsReceiver : BroadcastReceiver() {
 
             if (account.smsReceiverPhone.isNotNullOrBlank()) {
                 val currentSimPhone = getSimPhoneNumber(context, subscriptionId)
-                if (currentSimPhone != null && !currentSimPhone.contains(account.smsReceiverPhone!!)) {
+                // Android gives an empty number when it doesn't know it, which can't rule the SMS out.
+                if (currentSimPhone.isNotNullOrBlank() && !currentSimPhone!!.contains(account.smsReceiverPhone!!)) {
                     return@find false
                 }
             }

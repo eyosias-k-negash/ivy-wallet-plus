@@ -42,11 +42,12 @@ Ivy Wallet Plus can read your bank's SMS alerts and record the transactions for 
 **Set it up** by editing an account:
 
 1. Turn on **Auto Listen to SMS**.
-2. Enter the bank's sender name or number, or tap **PICK** to choose a contact. An SMS counts when its sender, or the sender's contact name, contains this text.
-3. Optionally, choose a **SIM slot** or enter the **receiving phone number**, so only messages that arrive on that SIM count.
-4. Enter an **SMS Parsing Regex**. A message must match it, and its first capture group is read as the amount. If you leave it empty, a generic pattern is used, but you'll usually need one that fits your bank's wording.
-5. Optionally, turn on **Use Advanced Multi-Regex** to use separate patterns, described below. **IMPORT CONFIG** loads all the patterns from a JSON file with any of these keys: `masterMatch`, `useMultiRegex`, `incomeRegex`, `expenseRegex`, `amountRegex`, `dateTimeRegex`, `descriptionRegex` and `balanceRegex`.
-6. **Capture Location** is on by default. Turn it off if you don't want SMS transactions to record where your phone was. See [Locations](#locations).
+2. Tap **SAMPLE SMS**, next to **Auto Listen to SMS**, and pick an SMS from your bank. Its sender and the SIM it came in on are filled in for you. You can also set them yourself, as in the next two steps.
+3. Enter the bank's sender name or number, or tap **PICK** to choose a contact. An SMS counts when its sender, or the sender's contact name, contains this text.
+4. Optionally, choose a **SIM** so only messages that arrive on it count. The list shows each SIM as `carrier (ID): phone number · SIM name`. The name is the one you gave the SIM in Android's settings, if any. The number only appears when Android knows it, and it's then checked as well. To type the receiving phone number yourself, choose **Manual Entry**.
+5. Enter an **SMS Parsing Regex**. A message must match it, and its first capture group is read as the amount. If you leave it empty, a generic pattern is used, but you'll usually need one that fits your bank's wording.
+6. Optionally, turn on **Use Advanced Multi-Regex** to use separate patterns, described below. **IMPORT CONFIG** loads all the patterns from a JSON file with any of these keys: `masterMatch`, `useMultiRegex`, `incomeRegex`, `expenseRegex`, `amountRegex`, `dateTimeRegex`, `descriptionRegex` and `balanceRegex`.
+7. **Capture Location** is on by default. Turn it off if you don't want SMS transactions to record where your phone was. See [Locations](#locations).
 
 | Pattern | What it does |
 |---|---|
@@ -70,10 +71,10 @@ New lines, no-break spaces and other invisible characters show as orange markers
 
 **What happens.** When a matching SMS arrives, the app saves the transaction to that account right away, titled `AUTO IN` or `AUTO OUT` plus the account name and a short code made from the message. It tags it `AUTO-<account name>`, a tag created when you save an account with SMS listening on. A "Transaction created" notification then lets you open the transaction to check or edit it. With **Capture Location** on, the transaction also gets the phone's location when the SMS arrived, if one is found within a few seconds.
 
-**Permissions.** The tester asks for SMS and Contacts access when you open it. Otherwise the app doesn't ask for these itself, so allow them in Android's settings under **Apps → Ivy Wallet+ → Permissions**:
+**Permissions.** **SAMPLE SMS** and the tester ask for SMS and Contacts access when you open them. **SAMPLE SMS** and the SIM list also ask for Phone access. Otherwise the app doesn't ask for these itself, so allow them in Android's settings under **Apps → Ivy Wallet+ → Permissions**:
 
 - **SMS** is required.
-- **Phone** lets the SIM picker list your SIMs.
+- **Phone** lets the SIM list show your SIMs and their phone numbers.
 - **Contacts** lets the app match senders by contact name.
 - **Location** set to **Allow all the time** lets **Capture Location** work while the app is closed. Ticking **Capture Location**, or tapping **ALLOW LOCATION ACCESS** below it, asks for this. With **Allow only while using the app**, SMS transactions get a location only when the app is open.
 

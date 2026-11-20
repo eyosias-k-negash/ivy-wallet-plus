@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.ContactsContract
+import android.provider.Settings
 import android.telephony.SubscriptionInfo
 import android.telephony.SubscriptionManager
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -16,7 +17,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraintsScope
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -174,6 +174,9 @@ fun BoxWithConstraintsScope.AccountModal(
     var smsTesterVisible by remember(modal) {
         mutableStateOf(false)
     }
+    var smsSamplePickerVisible by remember(modal) {
+        mutableStateOf(false)
+    }
 
     val context = LocalContext.current
     val forceNonZeroBalance = modal?.forceNonZeroBalance ?: false
@@ -235,28 +238,53 @@ fun BoxWithConstraintsScope.AccountModal(
         }
     )
 
-    val smsTesterPermissionLauncher = rememberLauncherForActivityResult(
+    var showAfterSmsAccess by remember { mutableStateOf<() -> Unit>({}) }
+    val smsAccessLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
         onResult = {
             if (context.hasPermission(Manifest.permission.READ_SMS)) {
-                smsTesterVisible = true
+                showAfterSmsAccess()
             } else {
                 android.widget.Toast.makeText(
                     context,
-                    "Allow SMS access to pick a message to test",
+                    "Allow SMS access to pick a message",
                     android.widget.Toast.LENGTH_LONG
                 ).show()
             }
         }
     )
-    val openSmsTester = {
-        // Contacts is optional: it lets the tester match a sender saved as a contact name.
-        val missing = listOf(Manifest.permission.READ_SMS, Manifest.permission.READ_CONTACTS)
-            .filterNot { context.hasPermission(it) }
+    // Only READ_SMS is required; the other permissions add detail to the SMS list.
+    val withSmsAccess: (permissions: List<String>, show: () -> Unit) -> Unit = { permissions, show ->
+        val missing = permissions.filterNot { context.hasPermission(it) }
         if (missing.isEmpty()) {
-            smsTesterVisible = true
+            show()
         } else {
-            smsTesterPermissionLauncher.launch(missing.toTypedArray())
+            showAfterSmsAccess = show
+            smsAccessLauncher.launch(missing.toTypedArray())
+        }
+    }
+    val openSmsTester = {
+        // Contacts lets the tester match a sender saved as a contact name.
+        withSmsAccess(listOf(Manifest.permission.READ_SMS, Manifest.permission.READ_CONTACTS)) {
+            smsTesterVisible = true
+        }
+    }
+    val openSmsSamplePicker = {
+        // Contacts and Phone let the list show contact and SIM names, and fill in the SIM's number.
+        withSmsAccess(listOf(Manifest.permission.READ_SMS, Manifest.permission.READ_CONTACTS) + simPermissions) {
+            smsSamplePickerVisible = true
+        }
+    }
+
+    val selectSim: (Int?) -> Unit = { subId ->
+        val simChanged = subId != smsSubscriptionIdText.text.toIntOrNull()
+        smsSubscriptionIdText = TextFieldValue(subId?.toString() ?: "")
+        val phone = subId?.let { getSimPhoneNumber(context, it) }
+        if (phone.isNotNullOrBlank()) {
+            smsReceiverPhoneText = TextFieldValue(phone!!)
+        } else if (simChanged) {
+            // Keeping the previous SIM's number could make the receiver reject SMS on this one.
+            smsReceiverPhoneText = TextFieldValue("")
         }
     }
 
@@ -369,14 +397,29 @@ fun BoxWithConstraintsScope.AccountModal(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        IvyCheckboxWithText(
-            modifier = Modifier
-                .padding(start = 16.dp)
-                .align(Alignment.Start),
-            text = "Auto Listen to SMS",
-            checked = smsAutoListenEnabled
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(end = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            smsAutoListenEnabled = it
+            IvyCheckboxWithText(
+                modifier = Modifier.padding(start = 16.dp),
+                text = "Auto Listen to SMS",
+                checked = smsAutoListenEnabled
+            ) {
+                smsAutoListenEnabled = it
+            }
+
+            if (smsAutoListenEnabled) {
+                Text(
+                    modifier = Modifier
+                        .clip(UI.shapes.rFull)
+                        .clickable { openSmsSamplePicker() }
+                        .padding(8.dp),
+                    text = "SAMPLE SMS",
+                    style = UI.typo.c.style(color = UI.colors.primary, fontWeight = FontWeight.ExtraBold)
+                )
+            }
         }
 
         if (smsAutoListenEnabled) {
@@ -434,17 +477,8 @@ fun BoxWithConstraintsScope.AccountModal(
             } else {
                 SimSubscriptionPicker(
                     subId = smsSubscriptionIdText.text.toIntOrNull(),
-                    onSubIdChanged = { subId ->
-                        smsSubscriptionIdText = TextFieldValue(subId?.toString() ?: "")
-                        if (subId != null) {
-                            val phone = getSimPhoneNumber(context, subId)
-                            if (phone.isNotNullOrBlank()) {
-                                smsReceiverPhoneText = TextFieldValue(phone!!)
-                            }
-                        } else {
-                            smsReceiverPhoneText = TextFieldValue("")
-                        }
-                    },
+                    receiverPhone = smsReceiverPhoneText.text,
+                    onSubIdChanged = selectSim,
                     onManualEntryClick = { manualSimEntry = true }
                 )
             }
@@ -706,6 +740,25 @@ fun BoxWithConstraintsScope.AccountModal(
         accountName = nameTextFieldValue.text.trim(),
         dismiss = { smsTesterVisible = false }
     )
+
+    SmsSamplePickerModal(
+        visible = smsSamplePickerVisible,
+        senderFilter = smsSenderPhone.text,
+        dismiss = { smsSamplePickerVisible = false },
+        onPick = { sender, subscriptionId ->
+            smsSenderPhone = TextFieldValue(sender)
+            if (subscriptionId != null) selectSim(subscriptionId)
+            android.widget.Toast.makeText(
+                context,
+                if (subscriptionId != null) {
+                    "Sender and SIM copied from the SMS"
+                } else {
+                    "Sender copied. The phone didn't record this SMS's SIM, so the SIM is unchanged."
+                },
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+        }
+    )
 }
 
 private fun Context.hasPermission(permission: String): Boolean =
@@ -724,10 +777,40 @@ private fun getContactNameFromUri(context: Context, contactUri: Uri): String? {
     }
 }
 
+// READ_PHONE_STATE lists the SIMs; READ_PHONE_NUMBERS lets Android tell us each SIM's number.
+private val simPermissions = listOf(
+    Manifest.permission.READ_PHONE_STATE,
+    Manifest.permission.READ_PHONE_NUMBERS
+)
+
+/**
+ * "Carrier (subscription ID): phone number · SIM name". The number is left out when it's unknown,
+ * and the name when the user hasn't given the SIM one.
+ */
+internal fun formatSim(context: Context, info: SubscriptionInfo?, subId: Int, phone: String?): String =
+    buildString {
+        val carrier = info?.carrierName?.takeIf { it.isNotBlank() }?.toString() ?: "SIM"
+        append("$carrier ($subId)")
+        if (phone.isNotNullOrBlank()) append(": $phone")
+        val name = info?.let { simName(context, it) }
+        if (name.isNotNullOrBlank() && !name.equals(carrier, ignoreCase = true)) append(" · $name")
+    }
+
+private fun simName(context: Context, info: SubscriptionInfo): String? {
+    // Samsung keeps the names set in its SIM manager here, one per slot, not in the SIM's display name.
+    val samsungName = try {
+        Settings.System.getString(context.contentResolver, "select_name_${info.simSlotIndex + 1}")
+    } catch (_: SecurityException) {
+        null
+    }
+    return samsungName ?: info.displayName?.toString()
+}
+
 @SuppressLint("MissingPermission")
 @Composable
 private fun SimSubscriptionPicker(
     subId: Int?,
+    receiverPhone: String,
     onSubIdChanged: (Int?) -> Unit,
     onManualEntryClick: () -> Unit
 ) {
@@ -735,19 +818,25 @@ private fun SimSubscriptionPicker(
     val subscriptionManager = remember {
         context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
     }
-    val activeSubscriptions = remember {
+    var expanded by remember { mutableStateOf(false) }
+    // Re-read when the list opens or the SIM changes, in case Phone access was just granted.
+    val activeSubscriptions = remember(subId, expanded) {
         try {
             subscriptionManager?.activeSubscriptionInfoList ?: emptyList()
         } catch (_: Exception) {
             emptyList()
         }
     }
-
-    var expanded by remember { mutableStateOf(false) }
+    // The list opens either way. Without access it can only offer Manual Entry.
+    val simPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions(),
+        onResult = { expanded = true }
+    )
 
     val selectedSim = activeSubscriptions.find { it.subscriptionId == subId }
-    val displayText = selectedSim?.let { "${it.displayName} (${it.subscriptionId})" }
-        ?: if (subId != null) "ID: $subId" else "Select SIM Slot"
+    // Shows the saved receiving number, which is what the SMS receiver checks.
+    val displayText = subId?.let { formatSim(context, selectedSim, it, receiverPhone) }
+        ?: "Select SIM Slot"
 
     Box(
         modifier = Modifier
@@ -764,7 +853,14 @@ private fun SimSubscriptionPicker(
                     shape = UI.shapes.rFull
                 )
                 .background(UI.colors.primary.copy(alpha = 0.1f), UI.shapes.rFull)
-                .clickable { expanded = true }
+                .clickable {
+                    val missing = simPermissions.filterNot { context.hasPermission(it) }
+                    if (missing.isEmpty()) {
+                        expanded = true
+                    } else {
+                        simPermissionLauncher.launch(missing.toTypedArray())
+                    }
+                }
                 .padding(vertical = 16.dp, horizontal = 24.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
@@ -791,21 +887,13 @@ private fun SimSubscriptionPicker(
             modifier = Modifier.fillMaxWidth(0.9f)
         ) {
             activeSubscriptions.forEach { info ->
-                val phone = getSimPhoneNumber(LocalContext.current, info.subscriptionId)
+                val phone = getSimPhoneNumber(context, info.subscriptionId)
                 DropdownMenuItem(
                     text = {
-                        val subText = if (phone.isNotNullOrBlank()) {
-                            "${info.subscriptionId}: ${info.carrierName}|$phone"
-                        } else {
-                            "${info.subscriptionId}: ${info.carrierName}"
-                        }
-                        Column {
-                            Text(text = info.displayName.toString(), fontWeight = FontWeight.Bold)
-                            Text(
-                                text = subText,
-                                style = UI.typo.c.style(color = Gray)
-                            )
-                        }
+                        Text(
+                            text = formatSim(context, info, info.subscriptionId, phone),
+                            fontWeight = FontWeight.Bold
+                        )
                     },
                     onClick = {
                         onSubIdChanged(info.subscriptionId)
