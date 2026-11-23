@@ -40,6 +40,7 @@ fun Toolbar(
 
     showDuplicateButton: Boolean,
     onDuplicate: () -> Unit,
+    showChangeTypeButton: Boolean = true,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically
@@ -53,32 +54,20 @@ fun Toolbar(
 
         Spacer(Modifier.weight(1f))
 
-        when (type) {
-            TransactionType.INCOME -> {
-                IvyOutlinedButton(
-                    text = stringResource(R.string.income),
-                    iconStart = R.drawable.ic_income
-                ) {
-                    onChangeTransactionTypeModal()
-                }
-
-                Spacer(Modifier.width(12.dp))
+        if (showChangeTypeButton) {
+            val (typeText, typeIcon) = when (type) {
+                TransactionType.INCOME -> R.string.income to R.drawable.ic_income
+                TransactionType.EXPENSE -> R.string.expense to R.drawable.ic_expense
+                TransactionType.TRANSFER -> R.string.transfer to R.drawable.ic_transfer
+            }
+            IvyOutlinedButton(
+                text = stringResource(typeText),
+                iconStart = typeIcon
+            ) {
+                onChangeTransactionTypeModal()
             }
 
-            TransactionType.EXPENSE -> {
-                IvyOutlinedButton(
-                    text = stringResource(R.string.expense),
-                    iconStart = R.drawable.ic_expense
-                ) {
-                    onChangeTransactionTypeModal()
-                }
-
-                Spacer(Modifier.width(12.dp))
-            }
-
-            else -> {
-                // show nothing
-            }
+            Spacer(Modifier.width(12.dp))
         }
 
         if (initialTransactionId != null) {

@@ -456,6 +456,7 @@
     <string name="decrease_loan">Decrease</string>
     <string name="msg_select_account_to_transfer">Select the transfer destination</string>
     <string name="msg_source_account_destination_account_same_for_transfer">Select a different destination account for the transfer</string>
+    <string name="msg_select_source_account_for_transfer">Select the account the transfer comes from</string>
     <string name="tags_optional">Tags (optional)</string>
     <string name="tags">Tags</string>
     <string name="search_tags">Search Tags</string>

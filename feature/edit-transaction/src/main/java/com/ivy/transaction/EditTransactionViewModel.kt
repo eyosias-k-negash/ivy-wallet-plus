@@ -148,6 +148,11 @@ class EditTransactionViewModel @Inject constructor(
     private var attachmentUrl by mutableStateOf<String?>(null)
     private var location by mutableStateOf<Location?>(null)
 
+    // Set when an income becomes a transfer: what its account received. The destination keeps
+    // receiving it whichever accounts or exchange rate are picked, until an amount is entered
+    // for the source.
+    private var receivedAmount: Double? = null
+
     // The camera always writes to the same temp file, so its URI is fixed. Keeping it out of
     // state means it's ready on the first "Take photo" tap and after process death.
     // It lives in filesDir, not cacheDir: when storage is low, Android purges app caches every
@@ -572,6 +577,8 @@ class EditTransactionViewModel @Inject constructor(
 
     private fun onAmountChanged(newAmount: Double) {
         viewModelScope.launch {
+            // Before a source is picked, the amount shown is the one received
+            receivedAmount = newAmount.takeIf { receivedAmount != null && account == null }
             loadedTransaction = loadedTransaction().copy(
                 amount = newAmount.toBigDecimal()
             )
@@ -609,7 +616,12 @@ class EditTransactionViewModel @Inject constructor(
             )
             account = newAccount
 
-            updateCustomExchangeRateState(fromAccount = newAccount)
+            val received = receivedAmount
+            if (received != null) {
+                keepReceivedAmount(received)
+            } else {
+                updateCustomExchangeRateState(fromAccount = newAccount)
+            }
 
             viewModelScope.launch {
                 updateCurrency(account = newAccount)
@@ -636,7 +648,14 @@ class EditTransactionViewModel @Inject constructor(
                 toAccountId = newAccount.id
             )
             toAccount = newAccount
-            updateCustomExchangeRateState(toAccountValue = newAccount)
+            // Until a source is picked, the amount is in the destination's currency
+            if (account == null) updateCurrency(account = newAccount)
+            val received = receivedAmount
+            if (received != null) {
+                keepReceivedAmount(received)
+            } else {
+                updateCustomExchangeRateState(toAccountValue = newAccount)
+            }
 
             saveIfEditMode()
         }
@@ -695,11 +714,40 @@ class EditTransactionViewModel @Inject constructor(
     }
 
     private fun onSetTransactionType(newTransactionType: TransactionType) {
-        loadedTransaction = loadedTransaction().copy(
-            type = newTransactionType
-        )
-        transactionType = newTransactionType
-        saveIfEditMode()
+        if (newTransactionType == transactionType) return
+
+        viewModelScope.launch {
+            val converted = convertTransactionType(
+                from = transactionType,
+                to = newTransactionType,
+                account = account,
+                toAccount = toAccount,
+                amount = amount,
+                // What the destination received, as saveInternal() stores it
+                toAmount = customExchangeRateState.convertedAmount ?: amount,
+            )
+            loadedTransaction = loadedTransaction().copy(
+                type = newTransactionType,
+                accountId = converted.account?.id ?: loadedTransaction().accountId,
+                toAccountId = converted.toAccount?.id,
+                amount = converted.amount.toBigDecimal()
+            )
+            receivedAmount = converted.amount.takeIf {
+                transactionType == TransactionType.INCOME &&
+                        newTransactionType == TransactionType.TRANSFER
+            }
+            transactionType = newTransactionType
+            account = converted.account
+            toAccount = converted.toAccount
+            amount = converted.amount
+            // After a type change there's at most one account, so no exchange rate applies
+            customExchangeRateState = CustomExchangeRateState()
+            // Without a source, the amount stays in the currency of the account that received it
+            (converted.account ?: converted.toAccount)?.let { updateCurrency(account = it) }
+
+            saveIfEditMode()
+            updateTitleSuggestions()
+        }
     }
 
     private fun onPayPlannedPayment() {
@@ -937,6 +985,12 @@ class EditTransactionViewModel @Inject constructor(
             }
             return false
         }
+        if (hasNotChosenAccountToTransferFrom()) {
+            viewModelScope.launch {
+                toaster.show(R.string.msg_select_source_account_for_transfer)
+            }
+            return false
+        }
 
         if (amount == 0.0) {
             return false
@@ -947,6 +1001,10 @@ class EditTransactionViewModel @Inject constructor(
 
     private fun hasNotChosenAccountToTransfer(): Boolean {
         return transactionType == TransactionType.TRANSFER && toAccount == null
+    }
+
+    private fun hasNotChosenAccountToTransferFrom(): Boolean {
+        return transactionType == TransactionType.TRANSFER && account == null
     }
 
     private fun hasChosenSameSourceAndDestinationAccountToTransfer(): Boolean {
@@ -961,13 +1019,20 @@ class EditTransactionViewModel @Inject constructor(
         dueDate = null
         category = null
         hasChanges = false
+        receivedAmount = null
     }
 
     private fun loadedTransaction() = loadedTransaction ?: error("Loaded transaction is null")
 
     private fun updateExchangeRate(exRate: Double?) {
         viewModelScope.launch {
-            updateCustomExchangeRateState(exchangeRate = exRate, resetRate = exRate == null)
+            val received = receivedAmount
+            if (received != null) {
+                keepReceivedAmount(received, exchangeRate = exRate)
+                saveIfEditMode()
+            } else {
+                updateCustomExchangeRateState(exchangeRate = exRate, resetRate = exRate == null)
+            }
         }
     }
 
@@ -1020,6 +1085,41 @@ class EditTransactionViewModel @Inject constructor(
             uiThread {
                 saveIfEditMode()
             }
+        }
+    }
+
+    /**
+     * Sets a transfer's amount in its source's currency, so that the destination still
+     * receives [receivedAmount] in its own. Uses [exchangeRate] if given, else the current one.
+     */
+    private suspend fun keepReceivedAmount(receivedAmount: Double, exchangeRate: Double? = null) {
+        val fromCurrency = account?.currency ?: baseUserCurrency
+        val toCurrency = toAccount?.currency ?: baseUserCurrency
+        val rate = if (account == null || toAccount == null || fromCurrency == toCurrency) {
+            null
+        } else {
+            exchangeRate?.takeIf { it > 0 } ?: exchangeRatesLogic.convertAmount(
+                baseCurrency = baseUserCurrency,
+                amount = 1.0,
+                fromCurrency = fromCurrency,
+                toCurrency = toCurrency
+            )
+        }
+
+        amount = if (rate == null) receivedAmount else receivedAmount / rate
+        loadedTransaction = loadedTransaction().copy(
+            amount = amount.toBigDecimal()
+        )
+        customExchangeRateState = if (rate == null) {
+            CustomExchangeRateState()
+        } else {
+            CustomExchangeRateState(
+                showCard = true,
+                toCurrencyCode = toCurrency,
+                fromCurrencyCode = fromCurrency,
+                exchangeRate = rate,
+                convertedAmount = receivedAmount
+            )
         }
     }
 
