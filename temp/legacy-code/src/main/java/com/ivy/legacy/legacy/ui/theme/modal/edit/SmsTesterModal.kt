@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.ivy.design.l0_system.UI
 import com.ivy.design.l0_system.style
+import com.ivy.legacy.sms.ParsedSmsTransaction
 import com.ivy.legacy.sms.SmsAmountSource
 import com.ivy.legacy.sms.SmsParseResult
 import com.ivy.legacy.sms.SmsParser
@@ -58,6 +59,7 @@ import com.ivy.legacy.sms.SmsRegexStep
 import com.ivy.legacy.sms.SmsTypeSource
 import com.ivy.legacy.sms.lookupContactName
 import com.ivy.ui.R
+import com.ivy.wallet.ui.theme.components.CircleButton
 import com.ivy.wallet.ui.theme.components.IvyCheckboxWithText
 import com.ivy.wallet.ui.theme.components.IvyOutlinedTextField
 import com.ivy.wallet.ui.theme.modal.IvyModal
@@ -105,6 +107,11 @@ fun BoxScope.SmsTesterModal(
     senderFilter: String,
     subscriptionId: Int?,
     accountName: String,
+    /**
+     * Opens a new, unsaved transaction prefilled with what the parser found.
+     * Null when there's no saved account to add it to.
+     */
+    onAddTransaction: ((ParsedSmsTransaction) -> Unit)?,
     dismiss: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -116,6 +123,18 @@ fun BoxScope.SmsTesterModal(
     var query by remember(sessionKey) { mutableStateOf(TextFieldValue("")) }
     var onlyFromSender by remember(sessionKey) { mutableStateOf(senderFilter.isNotBlank()) }
     val listState = rememberLazyListState()
+
+    val result = remember(selected, rules, accountName) {
+        selected?.let {
+            SmsParser.parse(
+                body = it.body,
+                rules = rules,
+                accountName = accountName,
+                receivedAtMillis = it.dateMillis
+            )
+        }
+    }
+    val transaction = result?.transaction
 
     LaunchedEffect(visible) {
         if (!visible) return@LaunchedEffect
@@ -131,9 +150,28 @@ fun BoxScope.SmsTesterModal(
         id = modalId,
         visible = visible,
         dismiss = dismiss,
+        SecondaryActions = {
+            // Makes room for "Add transaction": both labeled buttons don't fit on a phone.
+            if (transaction != null && onAddTransaction != null) {
+                Spacer(Modifier.width(12.dp))
+                CircleButton(
+                    icon = R.drawable.ic_back,
+                    contentDescription = "Other SMS"
+                ) {
+                    selected = null
+                }
+            }
+        },
         PrimaryAction = {
-            if (selected != null) {
-                ModalPositiveButton(
+            when {
+                transaction != null && onAddTransaction != null -> ModalPositiveButton(
+                    text = "Add transaction",
+                    iconStart = R.drawable.ic_plus
+                ) {
+                    onAddTransaction(transaction)
+                }
+
+                selected != null -> ModalPositiveButton(
                     text = "Other SMS",
                     iconStart = R.drawable.ic_back
                 ) {
@@ -160,7 +198,7 @@ fun BoxScope.SmsTesterModal(
         Spacer(Modifier.height(16.dp))
 
         val sms = selected
-        if (sms == null) {
+        if (sms == null || result == null) {
             SmsPicker(
                 inbox = inbox,
                 loadError = loadError,
@@ -175,10 +213,10 @@ fun BoxScope.SmsTesterModal(
         } else {
             SmsBreakdown(
                 sms = sms,
-                rules = rules,
+                result = result,
                 senderFilter = senderFilter,
                 subscriptionId = subscriptionId,
-                accountName = accountName,
+                canAddTransaction = onAddTransaction != null,
             )
         }
     }
@@ -378,19 +416,11 @@ private fun SmsRow(
 @Composable
 private fun ColumnScope.SmsBreakdown(
     sms: InboxSms,
-    rules: SmsParsingRules,
+    result: SmsParseResult,
     senderFilter: String,
     subscriptionId: Int?,
-    accountName: String,
+    canAddTransaction: Boolean,
 ) {
-    val result = remember(sms, rules, accountName) {
-        SmsParser.parse(
-            body = sms.body,
-            rules = rules,
-            accountName = accountName,
-            receivedAtMillis = sms.dateMillis
-        )
-    }
     val senderOk = SmsParser.senderMatches(senderFilter, sms.address, sms.contactName)
     val simOk = subscriptionId == null || sms.subscriptionId == null || sms.subscriptionId == subscriptionId
 
@@ -417,7 +447,7 @@ private fun ColumnScope.SmsBreakdown(
         } else {
             item { SingleRegexSummary(result) }
         }
-        item { ResultCard(result, senderOk, simOk) }
+        item { ResultCard(result, senderOk, simOk, canAddTransaction) }
         item { Spacer(Modifier.height(120.dp)) }
     }
 }
@@ -779,7 +809,12 @@ private fun SingleRegexSummary(result: SmsParseResult) {
 }
 
 @Composable
-private fun ResultCard(result: SmsParseResult, senderOk: Boolean, simOk: Boolean) {
+private fun ResultCard(
+    result: SmsParseResult,
+    senderOk: Boolean,
+    simOk: Boolean,
+    canAddTransaction: Boolean,
+) {
     val transaction = result.transaction
     InfoCard {
         if (transaction == null) {
@@ -807,6 +842,16 @@ private fun ResultCard(result: SmsParseResult, senderOk: Boolean, simOk: Boolean
             } else {
                 Text(text = visibleText(description), style = monoStyle())
             }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = if (canAddTransaction) {
+                    "\"Add transaction\" opens a new transaction with these details. " +
+                        "Nothing is saved until you add it there."
+                } else {
+                    "Save the account to add SMS like this one as transactions from here."
+                },
+                style = UI.typo.c.style(color = UI.colors.gray, fontWeight = FontWeight.Medium)
+            )
         }
 
         if (!senderOk || !simOk) {
