@@ -545,12 +545,25 @@ private fun BoxWithConstraintsScope.UI(
             dateTime = dateTime,
             dueDateTime = dueDate,
             onEditDate = onSetDate,
-            onEditTime = onSetTime,
-            location = location,
-            onCaptureLocation = onCaptureLocation,
-            onViewLocation = onViewLocation,
-            onRemoveLocation = { showRemoveLocationConfirm = true }
+            onEditTime = onSetTime
         )
+
+        Spacer(Modifier.height(12.dp))
+
+        if (location == null) {
+            AddPrimaryAttributeButton(
+                icon = R.drawable.ic_vue_location_location,
+                text = stringResource(R.string.add_location),
+                onClick = onCaptureLocation
+            )
+        } else {
+            AddPrimaryAttributeButton(
+                icon = R.drawable.ic_vue_location_location,
+                text = location.name ?: stringResource(R.string.location_attached),
+                onClick = { onViewLocation(location) },
+                onLongClick = { showRemoveLocationConfirm = true }
+            )
+        }
 
         if (transactionType == TransactionType.TRANSFER && customExchangeRateState.showCard) {
             Spacer(Modifier.height(12.dp))

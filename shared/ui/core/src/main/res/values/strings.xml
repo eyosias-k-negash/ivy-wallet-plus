@@ -509,6 +509,7 @@
     <string name="audio_note_attached">Audio note attached</string>
     <string name="msg_no_recorder_app">No voice recorder app found</string>
     <string name="location">Location</string>
+    <string name="add_location">Add location</string>
     <string name="location_attached">Location attached</string>
     <string name="remove_location">Remove location</string>
     <string name="msg_turn_on_location">Please turn on your location services</string>

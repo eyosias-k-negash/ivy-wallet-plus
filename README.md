@@ -80,9 +80,9 @@ New lines, no-break spaces and other invisible characters show as orange markers
 
 ## Locations
 
-- **Add:** tap the pin next to the transaction's date and time to save where you are. If needed, the app asks for location permission and to turn location on. It saves coordinates, not a place name.
-- **View:** once a location is saved, the pin is highlighted. Tap it to open the spot in your maps app.
-- **Remove:** long-press the pin and confirm.
+- **Add:** tap **Add location**, below the date and time on the transaction screen, to save where you are. If needed, the app asks for location permission and to turn location on. It saves coordinates, not a place name.
+- **View:** once a location is saved, the row reads **Location attached**. Tap it to open the spot in your maps app.
+- **Remove:** long-press **Location attached** and confirm.
 - **Spot:** transactions with a location show a pin next to the amount in transaction lists.
 - **From SMS:** transactions recorded from a bank SMS get the phone's location automatically, unless **Capture Location** is off in the account's SMS settings. Location must be on, and it's skipped if no fix is found within a few seconds.
 
