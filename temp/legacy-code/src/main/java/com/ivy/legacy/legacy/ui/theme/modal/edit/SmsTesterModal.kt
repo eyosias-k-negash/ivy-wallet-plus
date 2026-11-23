@@ -1,9 +1,11 @@
 package com.ivy.wallet.ui.theme.modal.edit
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.provider.Telephony
+import android.telephony.SubscriptionManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -77,14 +79,17 @@ private val listDateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm",
 private val fullDateFormatter = DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm:ss", Locale.getDefault())
 
 @Immutable
-private data class InboxSms(
+internal data class InboxSms(
     val id: Long,
     val address: String,
     val contactName: String?,
     val body: String,
     val dateMillis: Long,
     val subscriptionId: Int?,
-)
+) {
+    /** The SMS provider stores -1 when it doesn't know which SIM the SMS came in on. */
+    val knownSubscriptionId: Int? get() = subscriptionId?.takeIf { it >= 0 }
+}
 
 /**
  * Lets the user pick any SMS from the inbox and shows, step by step, how the
@@ -179,7 +184,7 @@ fun BoxScope.SmsTesterModal(
     }
 }
 
-private fun loadInboxSms(context: Context): List<InboxSms> {
+internal fun loadInboxSms(context: Context): List<InboxSms> {
     val projection = arrayOf(
         Telephony.Sms._ID,
         Telephony.Sms.ADDRESS,
@@ -223,8 +228,21 @@ private fun Context.canReadContacts(): Boolean =
     ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) ==
         PackageManager.PERMISSION_GRANTED
 
+/** SIM labels by subscription ID. Empty without the Phone permission. */
+@SuppressLint("MissingPermission")
+private fun loadSimLabels(context: Context): Map<Int, String> {
+    val subscriptionManager =
+        context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
+    return try {
+        subscriptionManager?.activeSubscriptionInfoList.orEmpty()
+            .associate { it.subscriptionId to formatSim(context, it, it.subscriptionId, phone = null) }
+    } catch (_: SecurityException) {
+        emptyMap()
+    }
+}
+
 @Composable
-private fun ColumnScope.SmsPicker(
+internal fun ColumnScope.SmsPicker(
     inbox: List<InboxSms>?,
     loadError: String?,
     query: TextFieldValue,
@@ -256,6 +274,8 @@ private fun ColumnScope.SmsPicker(
 
     Spacer(Modifier.height(8.dp))
 
+    val context = LocalContext.current
+    val simLabels = remember(inbox) { loadSimLabels(context) }
     val q = query.text.trim()
     val filtered = remember(inbox, q, onlyFromSender, senderFilter) {
         inbox.orEmpty().filter { sms ->
@@ -295,6 +315,9 @@ private fun ColumnScope.SmsPicker(
         items(items = filtered, key = { it.id }) { sms ->
             SmsRow(
                 sms = sms,
+                simLabel = sms.knownSubscriptionId?.let {
+                    simLabels[it] ?: formatSim(context, info = null, subId = it, phone = null)
+                },
                 senderMatches = senderFilter.isNotBlank() &&
                     SmsParser.senderMatches(senderFilter, sms.address, sms.contactName),
                 onClick = { onSelect(sms) }
@@ -309,6 +332,7 @@ private fun ColumnScope.SmsPicker(
 @Composable
 private fun SmsRow(
     sms: InboxSms,
+    simLabel: String?,
     senderMatches: Boolean,
     onClick: () -> Unit,
 ) {
@@ -335,7 +359,10 @@ private fun SmsRow(
             }
         }
         Text(
-            text = sms.dateMillis.formatWith(listDateFormatter),
+            text = buildString {
+                append(sms.dateMillis.formatWith(listDateFormatter))
+                simLabel?.let { append(" · $it") }
+            },
             style = UI.typo.c.style(color = UI.colors.gray, fontWeight = FontWeight.Medium)
         )
         Spacer(Modifier.height(4.dp))
