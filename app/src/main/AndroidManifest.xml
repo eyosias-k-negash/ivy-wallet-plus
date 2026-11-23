@@ -136,6 +136,10 @@
             android:name="com.ivy.wallet.sms.SmsNotificationDismissedReceiver"
             android:exported="false" />
 
+        <receiver
+            android:name="com.ivy.wallet.sms.AccountOutOfSyncDismissReceiver"
+            android:exported="false" />
+
         <service
             android:name=".PaymentTileService"
             android:exported="true"

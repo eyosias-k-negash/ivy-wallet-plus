@@ -27,6 +27,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.math.BigDecimal
 import java.time.Instant
 import java.util.UUID
@@ -57,6 +59,9 @@ class SmsReceiver : BroadcastReceiver() {
 
     @Inject
     lateinit var locationProvider: SmsLocationProvider
+
+    @Inject
+    lateinit var outOfSyncNotificationManager: AccountOutOfSyncNotificationManager
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -148,17 +153,32 @@ class SmsReceiver : BroadcastReceiver() {
             null
         }
 
-        saveTransactionAndNotify(
-            amount = transaction.amount,
-            transactionType = transaction.type,
-            title = transaction.title,
-            description = transaction.description,
-            dateTimeMillis = transaction.dateTimeMillis,
-            accountId = matchingAccount.id.value,
-            tagIds = matchingAccount.autoTagId?.let { listOf(it.value) } ?: emptyList(),
-            accountName = matchingAccount.name.value,
-            location = location,
-        )
+        // Banks often send two SMS at once, like a payment and its fee. Without the lock, one SMS's
+        // balance could be checked after the other's transaction was saved and look out of sync.
+        balanceLock.withLock {
+            saveTransactionAndNotify(
+                amount = transaction.amount,
+                transactionType = transaction.type,
+                title = transaction.title,
+                description = transaction.description,
+                dateTimeMillis = transaction.dateTimeMillis,
+                accountId = matchingAccount.id.value,
+                tagIds = matchingAccount.autoTagId?.let { listOf(it.value) } ?: emptyList(),
+                accountName = matchingAccount.name.value,
+                location = location,
+            )
+
+            transaction.balance?.let { smsBalance ->
+                // The transaction is already saved, so a failed check mustn't crash the app
+                runCatching {
+                    outOfSyncNotificationManager.check(
+                        account = matchingAccount,
+                        smsBalance = smsBalance,
+                        transactionTime = Instant.ofEpochMilli(transaction.dateTimeMillis),
+                    )
+                }.onFailure { Log.w(TAG, "Balance check failed", it) }
+            }
+        }
     }
 
     private suspend fun saveTransactionAndNotify(
@@ -223,5 +243,7 @@ class SmsReceiver : BroadcastReceiver() {
     }
 
     companion object {
+        // Shared by every SmsReceiver, since Android creates a new one for each broadcast
+        private val balanceLock = Mutex()
     }
 }

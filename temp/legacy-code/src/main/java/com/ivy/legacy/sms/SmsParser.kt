@@ -53,6 +53,8 @@ data class ParsedSmsTransaction(
     val dateTimeMillis: Long,
     val title: String,
     val description: String?,
+    /** The account balance the SMS reports after this transaction, if the balance regex found one. */
+    val balance: Double?,
 )
 
 /**
@@ -213,6 +215,7 @@ object SmsParser {
                 dateTimeMillis = parsedDateTimeMillis ?: receivedAtMillis,
                 title = title(type, accountName, body),
                 description = finalDescription,
+                balance = balance.toAmount(),
             )
         )
     }
