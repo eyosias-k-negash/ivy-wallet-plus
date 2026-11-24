@@ -527,6 +527,15 @@ private fun LazyListScope.multiRegexSteps(result: SmsParseResult) {
             outcome = balanceOutcome(result)
         )
     }
+    item {
+        StepCard(
+            title = "Fee",
+            step = result.feeStep,
+            needsGroups = true,
+            showAllMatches = true,
+            outcome = feeOutcome(result)
+        )
+    }
 }
 
 @Composable
@@ -571,6 +580,9 @@ private fun dateOutcome(result: SmsParseResult): Pair<String, Color> {
         else -> result.dateTimeProblem ?: "Couldn't build a date from these groups."
     }
     return when {
+        parsed != null && !result.rules.captureDate ->
+            "Found ${parsed.formatWith(fullDateFormatter)}, but Date is off in the Capture menu: " +
+                "the SMS receive time is used." to UI.colors.orange
         parsed != null && result.dateTimeSource == SmsValueSource.FIELD_REGEX ->
             "Date: ${parsed.formatWith(fullDateFormatter)}" to UI.colors.green
         parsed != null -> fromMaster(ownReason.removeSuffix("."), parsed.formatWith(fullDateFormatter))
@@ -589,6 +601,8 @@ private fun descriptionOutcome(result: SmsParseResult): Pair<String, Color> {
         else -> "No match"
     }
     return when {
+        result.description != null && !result.rules.captureDescription ->
+            "Found, but Description is off in the Capture menu: no description." to UI.colors.orange
         result.descriptionSource == SmsValueSource.MASTER_REGEX ->
             fromMaster(ownReason, "see the result below.")
         step == null || !step.isSet -> "Not set: no description." to UI.colors.gray
@@ -607,12 +621,39 @@ private fun balanceOutcome(result: SmsParseResult): Pair<String, Color> {
     val step = result.balanceStep
     val appended = "appended to the description as \"(Bal: ${result.balance})\"."
     return when {
+        result.balance != null && !result.rules.captureBalance ->
+            "Found \"${result.balance}\", but Balance is off in the Capture menu: it isn't added " +
+                "or checked." to UI.colors.orange
         result.balanceSource == SmsValueSource.FIELD_REGEX -> appended.replaceFirstChar { it.uppercase() } to
             UI.colors.green
         result.balanceSource == SmsValueSource.MASTER_REGEX ->
             fromMaster(if (step?.isSet == true) "No balance captured here" else "Not set", appended)
         step?.isSet != true -> "Not set." to UI.colors.gray
         else -> "No balance captured." to UI.colors.orange
+    }
+}
+
+@Composable
+private fun feeOutcome(result: SmsParseResult): Pair<String, Color> {
+    val step = result.feeStep
+    val fee = result.fee
+    val ownReason = when {
+        step == null || !step.isSet -> "Not set"
+        step.matched -> "No group here captured a fee"
+        else -> "No match"
+    }
+    return when {
+        fee == null && result.feeSource != null ->
+            "A fee value isn't a number after removing commas: no fee." to UI.colors.red
+        fee != null && !result.rules.captureFee ->
+            "Fee ${fee.plain()}, but Fee is off in the Capture menu: no fee expense." to UI.colors.orange
+        fee != null && fee <= 0.0 -> "Fee is ${fee.plain()}: no fee expense." to UI.colors.gray
+        fee != null && result.feeSource == SmsValueSource.MASTER_REGEX ->
+            fromMaster(ownReason, "fee ${fee.plain()}, saved as its own expense.")
+        fee != null -> "Fee ${fee.plain()}: every value added up, saved as its own expense." to UI.colors.green
+        step == null || !step.isSet -> "Not set: no fee." to UI.colors.gray
+        step.matched -> "Matched, but no group captured the fee." to UI.colors.red
+        else -> "No match: no fee." to UI.colors.gray
     }
 }
 
@@ -881,12 +922,13 @@ private fun SingleRegexSummary(result: SmsParseResult) {
                     "date" to (result.parsedDateTimeMillis?.formatWith(fullDateFormatter) ?: result.dateTimeProblem),
                     "description" to result.description,
                     "balance" to result.balance,
+                    "fee" to result.fee?.plain(),
                 ).joinToString(" ") { (field, value) ->
                     if (value == null) "No $field." else "${field.replaceFirstChar { it.uppercase() }}: $value."
                 }
             } else {
                 "Type ${result.type}, from keywords. Name groups, like (?<day>…), to also read the date, " +
-                    "description or balance."
+                    "description, balance or fee."
             },
             style = UI.typo.c.style(color = UI.colors.gray, fontWeight = FontWeight.Medium)
         )
@@ -917,7 +959,11 @@ private fun ResultCard(
             ResultField(
                 "Date",
                 transaction.dateTimeMillis.formatWith(fullDateFormatter) +
-                    if (result.parsedDateTimeMillis != null) " (from the SMS text)" else " (receive time)"
+                    if (result.parsedDateTimeMillis != null && result.rules.captureDate) {
+                        " (from the SMS text)"
+                    } else {
+                        " (receive time)"
+                    }
             )
             ResultField("Title", transaction.title)
             FieldLabel("Description")
@@ -927,11 +973,16 @@ private fun ResultCard(
             } else {
                 Text(text = visibleText(description), style = monoStyle())
             }
+            transaction.fee?.let { fee ->
+                Spacer(Modifier.height(4.dp))
+                ResultField("Fee", "${fee.plain()}, saved as its own expense in the Fees category")
+            }
             Spacer(Modifier.height(8.dp))
             Text(
                 text = if (canAddTransaction) {
                     "\"Add transaction\" opens a new transaction with these details. " +
-                        "Nothing is saved until you add it there."
+                        "Nothing is saved until you add it there." +
+                        if (transaction.fee != null) " The fee isn't included: add it as its own expense." else ""
                 } else {
                     "Save the account to add SMS like this one as transactions from here."
                 },

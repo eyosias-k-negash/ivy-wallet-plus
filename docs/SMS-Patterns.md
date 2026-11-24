@@ -19,6 +19,7 @@ The order of the groups doesn't matter, so `(?<year>\d{4})-(?<month>\d{2})-(?<da
 | `amount` | Amount, master | The transaction amount. Commas are removed, so `1,250.00` is 1250. |
 | `balance` | Balance, master | The balance after the transaction. It's added to the description as `(Bal: …)` and [checked against the app](../README.md#out-of-sync-warnings). |
 | `description` | Description, master | Text for the description. Every `description` group that takes part, from every match, goes on its own line. |
+| `fee` | Fee, master | A fee charged with the transaction. Every `fee` group that takes part, from every match, is added up, so a service charge and its VAT become one fee. With **Fee** ticked in the Capture menu, it's saved as its own expense in the Fees category. |
 | `income`, `expense` | Master | If the group takes part in the match, it sets the transaction type. |
 | `day` | Date/time, master | 1 to 31. |
 | `month` | Date/time, master | 1 to 12, or an English month name: `Jan`, `Sept` or `January`. |
@@ -27,17 +28,17 @@ The order of the groups doesn't matter, so `(?<year>\d{4})-(?<month>\d{2})-(?<da
 | `minute`, `second` | Date/time, master | Without them, 0. |
 | `ampm` | Date/time, master | Text starting with `a` or `p`, like `AM`, `pm` or `a.m.` |
 
-"Read from" is where the parser looks for the name. In the **Amount Extraction** pattern, for example, only `amount` counts. The tester flags a name that's misspelled or in a pattern that doesn't read it.
+"Read from" is where the parser looks for the name. In the **Amount** pattern, for example, only `amount` counts. The tester flags a name that's misspelled or in a pattern that doesn't read it.
 
 Names ignore case: `Day` is the same as `day`.
 
 ### Where each value comes from
 
-1. The value's own pattern, like **Date/Time Extraction** for the date.
+1. The value's own pattern, like **Date/time** for the date.
 2. If that pattern is empty, doesn't match or gives no value, the group with the same name in the master pattern.
 3. If neither gives one: no amount means no transaction, no date means the time the SMS arrived, and no type means keywords decide. Words like "credited" or "received" make it income, anything else an expense.
 
-For the type, the **Income** and **Expense Identification** patterns come first. If either matches anywhere in the message, it decides.
+For the type, the **Income** and **Expense identification** patterns come first. If either matches anywhere in the message, it decides.
 
 ### Patterns without names
 
@@ -46,6 +47,7 @@ A pattern with no named groups works as it always has, by group position:
 - Amount and balance: group 1.
 - Date/time: day, month and year, optionally followed by hour, minute and second.
 - Description: every group.
+- Fee: every group, added up.
 - Master: group 1 is the amount. Nothing else is read from it.
 
 Once a pattern has a named group, only names count in it. Unnamed groups are then ignored, so you can use them freely, like `(debited|credited) with (?<amount>[\d,.]+)`.
@@ -58,13 +60,15 @@ Some senders write `20/11/2026` in one message and `2026-11-21` in another. Java
 on (?:(?<day>\d{2})/(?<month>\d{2})/(?<year>\d{4})|(?<year2>\d{4})-(?<month2>\d{2})-(?<day2>\d{2})) (?<hour>\d{2}):(?<minute>\d{2}):(?<second>\d{2})
 ```
 
-Only one of the two layouts takes part in a match, and the parser uses the groups that did. If several groups for the same value take part, the first one is used. The description is the exception: it uses them all.
+Only one of the two layouts takes part in a match, and the parser uses the groups that did. If several groups for the same value take part, the first one is used. The description and fee are the exceptions: they use them all.
+
+The same trick names a fee charged in parts: `service charge USD (?<fee>[\d,.]+) and VAT USD (?<fee2>[\d,.]+)` gives one fee, the two added up.
 
 A date that doesn't exist, like month 13 or 31 November, is rejected instead of rolled over, and the transaction gets the time the SMS arrived. The tester says why, and points out when the day and month look swapped.
 
 ## A full config
 
-**IMPORT CONFIG**, in the account's SMS settings, loads a JSON file with these keys. Any key can be left out. In JSON, every backslash is written twice, so `\d` becomes `\\d`.
+**IMPORT CONFIG**, in the account's **SMS structure**, loads a JSON file with these keys. Any key can be left out. In JSON, every backslash is written twice, so `\d` becomes `\\d`.
 
 Say Example Bank sends these:
 
@@ -72,7 +76,7 @@ Say Example Bank sends these:
 >
 > Dear Customer, your account 1\*\*\*\*89 was credited with USD 40.00 on 2026-11-21 at 18:30:05 from Jane Doe. Available balance: USD 8,440.50.
 
-With **Use Advanced Multi-Regex**, each value has its own pattern:
+With **Use advanced multi-regex**, each value has its own pattern. A bank that charges a fee would add a `feeRegex` the same way:
 
 ```json
 {

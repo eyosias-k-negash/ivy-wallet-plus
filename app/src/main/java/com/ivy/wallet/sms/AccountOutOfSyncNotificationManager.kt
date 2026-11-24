@@ -9,8 +9,6 @@ import com.ivy.base.time.TimeProvider
 import com.ivy.data.model.Account
 import com.ivy.data.model.AccountId
 import com.ivy.data.repository.AccountRepository
-import com.ivy.data.repository.CategoryRepository
-import com.ivy.design.l0_system.Ivy
 import com.ivy.legacy.sms.SmsBalanceCheck
 import com.ivy.legacy.utils.format
 import com.ivy.navigation.EditTransactionScreen
@@ -19,8 +17,6 @@ import com.ivy.wallet.RootViewModel
 import com.ivy.wallet.android.notification.IvyNotificationChannel
 import com.ivy.wallet.android.notification.NotificationService
 import com.ivy.wallet.domain.action.account.CalcAccBalanceAct
-import com.ivy.wallet.domain.deprecated.logic.CategoryCreator
-import com.ivy.wallet.domain.deprecated.logic.model.CreateCategoryData
 import com.ivy.wallet.domain.pure.data.ClosedTimeRange
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.math.BigDecimal
@@ -39,8 +35,7 @@ class AccountOutOfSyncNotificationManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val notificationService: NotificationService,
     private val accountRepository: AccountRepository,
-    private val categoryRepository: CategoryRepository,
-    private val categoryCreator: CategoryCreator,
+    private val smsCategories: SmsCategories,
     private val calcAccBalanceAct: CalcAccBalanceAct,
     private val timeProvider: TimeProvider,
 ) {
@@ -75,7 +70,7 @@ class AccountOutOfSyncNotificationManager @Inject constructor(
                 initialTransactionId = null,
                 type = difference.transactionType(),
                 accountId = accountId,
-                categoryId = rebalanceCategoryId(),
+                categoryId = smsCategories.findOrCreate(REBALANCE_CATEGORY, icon = "calculator"),
                 amount = difference.abs().toDouble(),
             )
         }
@@ -85,18 +80,6 @@ class AccountOutOfSyncNotificationManager @Inject constructor(
         calcAccBalanceAct(
             CalcAccBalanceAct.Input(account = account, range = until?.let { ClosedTimeRange.to(it) })
         ).balance
-
-    private suspend fun rebalanceCategoryId(): UUID? {
-        categoryRepository.findAll()
-            .find { it.name.value.equals(REBALANCE_CATEGORY, ignoreCase = true) }
-            ?.let { return it.id.value }
-
-        var createdId: UUID? = null
-        categoryCreator.createCategory(
-            CreateCategoryData(name = REBALANCE_CATEGORY, color = Ivy, icon = "calculator")
-        ) { createdId = it.id.value }
-        return createdId
-    }
 
     private fun show(account: Account, smsBalance: Double, appBalance: BigDecimal, difference: BigDecimal) {
         val accountId = account.id.value

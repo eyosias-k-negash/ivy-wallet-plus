@@ -41,54 +41,61 @@ Attach a photo or a voice note, such as a receipt, an invoice or a reminder of w
 
 Ivy Wallet Plus can read your bank's SMS alerts and record the transactions for you.
 
-**Set it up** by editing an account:
+**Set it up** by editing an account and turning on **Auto Listen to SMS**. The settings come in three parts. Each part shows what can be filled in for you. Tap its header (**MANUAL** or **DETAILS**) to also show the fields you fill in yourself, and again to hide them.
 
-1. Turn on **Auto Listen to SMS**.
-2. Tap **SAMPLE SMS**, next to **Auto Listen to SMS**, and pick an SMS from your bank. Its sender and the SIM it came in on are filled in for you. You can also set them yourself, as in the next two steps.
-3. Enter the bank's sender name or number, or tap **PICK** to choose a contact. An SMS counts when its sender, or the sender's contact name, contains this text.
-4. Optionally, choose a **SIM** so only messages that arrive on it count. The list shows each SIM as `carrier (ID): phone number · SIM name`. The name is the one you gave the SIM in Android's settings, if any. The number only appears when Android knows it, and it's then checked as well. To type the receiving phone number yourself, choose **Manual Entry**.
-5. Enter an **SMS Parsing Regex**. A message must match it, and its first capture group, or a group named `amount`, is read as the amount. If you leave it empty, a generic pattern is used, but you'll usually need one that fits your bank's wording.
-6. Optionally, turn on **Use Advanced Multi-Regex** to use separate patterns, described below. **IMPORT CONFIG** loads all the patterns from a JSON file with any of these keys: `masterMatch`, `useMultiRegex`, `incomeRegex`, `expenseRegex`, `amountRegex`, `dateTimeRegex`, `descriptionRegex` and `balanceRegex`.
-7. **Capture Location** is on by default. Turn it off if you don't want SMS transactions to record where your phone was. See [Locations](#locations).
+1. **Profile** says which SMS belong to the account.
+   - **SAMPLE SMS** lets you pick an SMS from your bank, and fills in its sender and the SIM it came in on.
+   - **Bank phone no. / contact**: tap **PICK** to choose a contact, or open **MANUAL** to type the sender's name or number. An SMS counts when its sender, or the sender's contact name, contains this text. Left empty, it matches every sender.
+   - **Contact SIM no.**: optionally choose a SIM so only messages that arrive on it count. The list shows each SIM as `carrier (ID): phone number · SIM name`. The name is the one you gave the SIM in Android's settings, if any. The number only appears when Android knows it, and it's then checked as well. To type the receiving phone number and SIM slot yourself, choose **Manual Entry** or open **MANUAL**.
+2. **Capture menu** picks what a transaction gets besides its amount and type: **Location**, **Date**, **Fee**, **Description** and **Balance & rebalance**. All but **Fee** are on by default. **DETAILS** explains each one. Date, fee, description and balance come from their own patterns or from named groups in the master pattern. A **NO REGEX** tag shows when neither can give a ticked value. See [Locations](#locations) and [Out-of-sync warnings](#out-of-sync-warnings).
+3. **SMS structure** holds the patterns. **IMPORT CONFIG** loads them all from a JSON file with any of these keys: `masterMatch`, `useMultiRegex`, `incomeRegex`, `expenseRegex`, `amountRegex`, `dateTimeRegex`, `descriptionRegex`, `balanceRegex` and `feeRegex`.
+   - **Simple** has the **Master regex**, always shown. A message must match it, and its first capture group, or a group named `amount`, is read as the amount. If you leave it empty, a generic pattern is used, but you'll usually need one that fits your bank's wording.
+   - **MANUAL** reveals **Use advanced multi-regex**, which turns on the separate patterns below. **HIDE** and **SHOW** fold them away. A pattern whose box is off in the Capture menu is tagged **OFF IN CAPTURE MENU**.
+   - **TEST WITH AN SMS**, at the bottom, tries the patterns on a real SMS.
 
 | Pattern | What it does |
 |---|---|
-| Income / Expense Identification | If either matches anywhere in the message, it sets the transaction type. |
-| Amount Extraction | The `amount` group is the amount. Commas are stripped. |
-| Date/Time Extraction | Groups named `day`, `month` (a number or an English name like `Jan`), `year` (2 or 4 digits), `hour`, `minute`, `second` and `ampm`, in any order. Only day and month are required. |
-| Description Extraction | Every `description` group from every match, one per line. |
-| Balance Extraction | The `balance` group is added to the description as `(Bal: …)`, and checked against the account's balance. See [Out-of-sync warnings](#out-of-sync-warnings). |
+| Income / Expense identification | If either matches anywhere in the message, it sets the transaction type. |
+| Amount | The `amount` group is the amount. Commas are stripped. |
+| Date/time | Groups named `day`, `month` (a number or an English name like `Jan`), `year` (2 or 4 digits), `hour`, `minute`, `second` and `ampm`, in any order. Only day and month are required. Used when **Date** is on. |
+| Description | Every `description` group from every match, one per line. Used when **Description** is on. |
+| Balance | The `balance` group is added to the description as `(Bal: …)`, and checked against the account's balance. Used when **Balance & rebalance** is on. See [Out-of-sync warnings](#out-of-sync-warnings). |
+| Fee | Every `fee` group from every match is added up, so a service charge and its VAT become one fee. Used when **Fee** is on: see below. |
 
-**Named groups** like `(?<day>\d{2})` let the values come in any order, so one pattern can read dates written as `20/11/2026` in one SMS and `2026-11-21` in the next. The master pattern can name values too. They're used when a value's own pattern is empty or finds nothing, and in single-regex mode. Patterns without named groups still work by position: group 1 is the amount or balance, the date groups are day, month, year, hour, minute and second, and the description takes every group. [Writing SMS patterns](docs/SMS-Patterns.md) lists every name, with examples and tips for sharing a config.
+**Named groups** like `(?<day>\d{2})` let the values come in any order, so one pattern can read dates written as `20/11/2026` in one SMS and `2026-11-21` in the next. The master pattern can name values too. They're used when a value's own pattern is empty or finds nothing, and in single-regex mode. Patterns without named groups still work by position: group 1 is the amount or balance, the date groups are day, month, year, hour, minute and second, and the description and fee take every group. [Writing SMS patterns](docs/SMS-Patterns.md) lists every name, with examples and tips for sharing a config.
 
-Without a type match, words like "credited", "received", "deposited" or "added" make the transaction income, and anything else makes it an expense. Without a date match, the transaction is dated when the SMS arrives. An empty pattern field is ignored.
+Without a type match, words like "credited", "received", "deposited" or "added" make the transaction income, and anything else makes it an expense. Without a date match, or with **Date** off, the transaction is dated when the SMS arrives. An empty pattern field is ignored, and so is an invalid pattern whose box is off in the Capture menu.
 
 Every pattern runs case-insensitive, with `DOTALL` (`.` also matches new lines) and `MULTILINE` (`^` and `$` match at each line). A long SMS that arrives in several parts is read as one message.
 
-**Test your patterns.** Tap **TEST WITH AN SMS**, below the pattern fields, and pick any SMS from your inbox. The tester runs the same parser as the SMS listener, with the values in the form, including edits you haven't saved. It shows:
+**Test your patterns.** Tap **TEST WITH AN SMS**, at the bottom of **SMS structure**, and pick any SMS from your inbox. The tester runs the same parser as the SMS listener, with the values in the form, including edits you haven't saved. It shows:
 
 - whether the sender and SIM checks pass,
-- what each pattern matched and every capture group,
-- the transaction that would be created, or why none would be.
+- what each pattern matched and every capture group, and whether the Capture menu leaves it out,
+- the transaction that would be created, with its fee, or why none would be.
 
 New lines, no-break spaces and other invisible characters show as orange markers. They're often lost when you copy an SMS to a computer, which is why a pattern can work there but fail on the phone. The picked SMS stays selected, so you can edit a pattern and test again. The tester doesn't check the receiving phone number, or whether another account with a matching sender would get the SMS first.
 
-**Add an SMS by hand.** When the picked SMS gives a transaction, tap **Add transaction** at the bottom of the tester, for example for an SMS that arrived before you turned on listening. It opens a new transaction for this account, filled in with the type, amount, date, title, description and `AUTO-` tag the listener would use. Nothing is saved until you tap **Add** there. The account has to be saved first, because opening the transaction closes the account form.
+**Add an SMS by hand.** When the picked SMS gives a transaction, tap **Add transaction** at the bottom of the tester, for example for an SMS that arrived before you turned on listening. It opens a new transaction for this account, filled in with the type, amount, date, title, description and `AUTO-` tag the listener would use. Nothing is saved until you tap **Add** there. It doesn't include the fee, which you add as its own expense. The account has to be saved first, because opening the transaction closes the account form.
 
-**What happens.** When a matching SMS arrives, the app saves the transaction to that account right away, titled `AUTO IN` or `AUTO OUT` plus the account name and a short code made from the message. It tags it `AUTO-<account name>`, a tag created when you save an account with SMS listening on. A "Transaction created" notification then lets you open the transaction to check or edit it. With **Capture Location** on, the transaction also gets the phone's location when the SMS arrived, if one is found within a few seconds.
+**What happens.** When a matching SMS arrives, the app saves the transaction to that account right away, titled `AUTO IN` or `AUTO OUT` plus the account name and a short code made from the message. It tags it `AUTO-<account name>`, a tag created when you save an account with SMS listening on. A "Transaction created" notification then lets you open the transaction to check or edit it. With **Location** on, the transaction also gets the phone's location when the SMS arrived, if one is found within a few seconds.
+
+**Fees.** With **Fee** on and a fee found, a second expense is saved in your Fees category, titled `AUTO FEE` plus the account name and the same short code. It has the same date, location and tag as the transaction, and its own notification. Leave **Fee** off if your bank's amount already includes the fee, or it's counted twice.
+
+**Fees and Rebalance categories.** The app uses the category you already have with that name, even in another case or spacing, or singular instead of plural (`Fee` for Fees). Only when there's none does it create one, the first time it's needed.
 
 **Permissions.** **SAMPLE SMS** and the tester ask for SMS and Contacts access when you open them. **SAMPLE SMS** and the SIM list also ask for Phone access. Otherwise the app doesn't ask for these itself, so allow them in Android's settings under **Apps → Ivy Wallet+ → Permissions**:
 
 - **SMS** is required.
 - **Phone** lets the SIM list show your SIMs and their phone numbers.
 - **Contacts** lets the app match senders by contact name.
-- **Location** set to **Allow all the time** lets **Capture Location** work while the app is closed. Ticking **Capture Location**, or tapping **ALLOW LOCATION ACCESS** below it, asks for this. With **Allow only while using the app**, SMS transactions get a location only when the app is open.
+- **Location** set to **Allow all the time** lets the Capture menu's **Location** work while the app is closed. Ticking **Location**, or tapping **ALLOW LOCATION ACCESS** below it, asks for this. With **Allow only while using the app**, SMS transactions get a location only when the app is open.
 
 ### Out-of-sync warnings
 
-When a pattern reads the balance from the SMS, every SMS transaction is followed by a balance check. If the balance in the SMS differs from the account's balance in the app by a cent or more, an "Out of sync" notification shows both balances. Usually a transaction is missing, doubled or has the wrong amount. From the notification, you can:
+When a pattern reads the balance from the SMS and **Balance & rebalance** is on in the Capture menu, every SMS transaction (and its fee) is followed by a balance check. If the balance in the SMS differs from the account's balance in the app by a cent or more, an "Out of sync" notification shows both balances. Usually a transaction is missing, doubled or has the wrong amount. From the notification, you can:
 
-- **Tap it** to open Add transaction with the account, the Rebalance category (created the first time) and the difference already filled in, as income if the app shows too little or an expense if it shows too much. The difference is worked out again when you tap, so it accounts for changes you made in the meantime, like correcting the SMS transaction. If nothing is left to fix, a message says so.
+- **Tap it** to open Add transaction with the account, your Rebalance category (reused if you have one, otherwise created) and the difference already filled in, as income if the app shows too little or an expense if it shows too much. The difference is worked out again when you tap, so it accounts for changes you made in the meantime, like correcting the SMS transaction. If nothing is left to fix, a message says so.
 - **Fix manually** to open the account's transactions and find the problem yourself.
 - **Dismiss** it.
 
@@ -100,7 +107,7 @@ Each account has at most one warning. The next SMS for the account replaces it, 
 - **View:** once a location is saved, the row reads **Location attached**. Tap it to open the spot in your maps app.
 - **Remove:** long-press **Location attached** and confirm.
 - **Spot:** transactions with a location show a pin next to the amount in transaction lists.
-- **From SMS:** transactions recorded from a bank SMS get the phone's location automatically, unless **Capture Location** is off in the account's SMS settings. Location must be on, and it's skipped if no fix is found within a few seconds.
+- **From SMS:** transactions recorded from a bank SMS get the phone's location automatically, unless **Location** is off in the account's Capture menu. Location must be on, and it's skipped if no fix is found within a few seconds.
 
 ## Account balance on any day
 

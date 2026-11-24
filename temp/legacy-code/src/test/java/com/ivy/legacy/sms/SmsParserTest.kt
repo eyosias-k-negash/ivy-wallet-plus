@@ -107,6 +107,100 @@ class SmsParserTest {
     }
 
     @Test
+    fun `fee adds up every group of every match`() {
+        val text = "$body Service charge USD 5.00 and VAT USD 0.75."
+        val result = parse(
+            multiRules.copy(feeRegex = "(?:Service charge|VAT) USD ([0-9,.]+\\d)", captureFee = true),
+            text
+        )
+
+        result.feeStep!!.matches.size shouldBe 2
+        result.fee shouldBe 5.75
+        result.transaction!!.fee shouldBe 5.75
+        result.transaction!!.amount shouldBe 1250.0
+    }
+
+    @Test
+    fun `fee can come from named groups in the master`() {
+        val text = "$body Service charge USD 5.00 and VAT USD 0.75."
+        val result = parse(
+            SmsParsingRules(
+                masterRegex = "debited with USD (?<amount>[0-9,.]+\\d).*Service charge USD (?<fee>[0-9,.]+\\d) " +
+                    "and VAT USD (?<fee2>[0-9,.]+\\d)",
+                useMultiRegex = false,
+                captureFee = true,
+            ),
+            text
+        )
+
+        result.feeSource shouldBe SmsValueSource.MASTER_REGEX
+        result.transaction!!.amount shouldBe 1250.0
+        result.transaction!!.fee shouldBe 5.75
+    }
+
+    @Test
+    fun `only named fee groups are added up`() {
+        val text = "$body Service charge USD 5.00 (ref 42)."
+        val result = parse(
+            multiRules.copy(feeRegex = "Service charge USD (?<fee>[0-9,.]+\\d) \\(ref (\\d+)\\)", captureFee = true),
+            text
+        )
+
+        result.feeSource shouldBe SmsValueSource.FIELD_REGEX
+        result.transaction!!.fee shouldBe 5.0
+    }
+
+    @Test
+    fun `fee isn't saved when fee capture is off`() {
+        val text = "$body Service charge USD 5.00."
+        val result = parse(multiRules.copy(feeRegex = "Service charge USD ([0-9,.]+\\d)"), text)
+
+        result.fee shouldBe 5.0
+        result.transaction!!.fee shouldBe null
+    }
+
+    @Test
+    fun `zero or unreadable fee gives no fee`() {
+        val rules = multiRules.copy(feeRegex = "Service charge USD (\\S+?)\\.?$", captureFee = true)
+
+        parse(rules, "$body Service charge USD 0.00").transaction!!.fee shouldBe null
+        parse(rules, "$body Service charge USD five").fee shouldBe null
+        parse(rules, "$body Service charge USD five").transaction!!.fee shouldBe null
+    }
+
+    @Test
+    fun `capture menu turns off date, description and balance`() {
+        val result = parse(
+            multiRules.copy(captureDate = false, captureDescription = false, captureBalance = false)
+        )
+
+        val transaction = result.transaction!!
+        transaction.dateTimeMillis shouldBe 0L
+        transaction.description shouldBe null
+        transaction.balance shouldBe null
+        // The tester still sees what the regexes found.
+        result.parsedDateTimeMillis shouldNotBe null
+        result.description shouldBe "Payment to ABC Supermarket"
+        result.balance shouldBe "8,400.50"
+    }
+
+    @Test
+    fun `balance without description capture is the whole description`() {
+        val result = parse(multiRules.copy(captureDescription = false))
+
+        result.transaction!!.description shouldBe "(Bal: 8,400.50)"
+        result.transaction!!.balance shouldBe 8400.5
+    }
+
+    @Test
+    fun `invalid regex of a field that isn't captured doesn't stop the transaction`() {
+        val result = parse(multiRules.copy(descriptionRegex = "for (.+", captureDescription = false))
+
+        result.transaction shouldNotBe null
+        result.failure shouldBe null
+    }
+
+    @Test
     fun `sender filter matches address or contact name`() {
         SmsParser.senderMatches("examplebank", "EXAMPLEBANK", null) shouldBe true
         SmsParser.senderMatches("Bank", "+15550100000", "My Bank") shouldBe true

@@ -63,6 +63,9 @@ class SmsReceiver : BroadcastReceiver() {
     @Inject
     lateinit var outOfSyncNotificationManager: AccountOutOfSyncNotificationManager
 
+    @Inject
+    lateinit var smsCategories: SmsCategories
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -134,6 +137,11 @@ class SmsReceiver : BroadcastReceiver() {
             dateTimeRegex = matchingAccount.smsDateTimeRegex,
             descriptionRegex = matchingAccount.smsDescriptionRegex,
             balanceRegex = matchingAccount.smsBalanceRegex,
+            feeRegex = matchingAccount.smsFeeRegex,
+            captureDate = matchingAccount.smsCaptureDate,
+            captureDescription = matchingAccount.smsCaptureDescription,
+            captureBalance = matchingAccount.smsCaptureBalance,
+            captureFee = matchingAccount.smsCaptureFee,
         )
         val result = SmsParser.parse(
             body = body,
@@ -168,6 +176,25 @@ class SmsReceiver : BroadcastReceiver() {
                 location = location,
             )
 
+            transaction.fee?.let { fee ->
+                // The transaction is already saved, so a failed fee mustn't stop the balance check
+                runCatching {
+                    // Its own expense, with the date, place and tag of the transaction it was charged for
+                    saveTransactionAndNotify(
+                        amount = fee,
+                        transactionType = TransactionType.EXPENSE,
+                        title = SmsParser.feeTitle(matchingAccount.name.value, body),
+                        description = "Fee for ${transaction.title}",
+                        dateTimeMillis = transaction.dateTimeMillis,
+                        accountId = matchingAccount.id.value,
+                        tagIds = matchingAccount.autoTagId?.let { listOf(it.value) } ?: emptyList(),
+                        accountName = matchingAccount.name.value,
+                        location = location,
+                        categoryId = smsCategories.findOrCreate(FEE_CATEGORY, icon = "bank"),
+                    )
+                }.onFailure { Log.w(TAG, "Saving the fee failed", it) }
+            }
+
             transaction.balance?.let { smsBalance ->
                 // The transaction is already saved, so a failed check mustn't crash the app
                 runCatching {
@@ -191,6 +218,7 @@ class SmsReceiver : BroadcastReceiver() {
         tagIds: List<UUID>,
         accountName: String,
         location: Location?,
+        categoryId: UUID? = null,
     ) {
         val transactionId = UUID.randomUUID()
         val legacyTransaction = com.ivy.base.legacy.Transaction(
@@ -198,6 +226,7 @@ class SmsReceiver : BroadcastReceiver() {
             accountId = accountId,
             type = transactionType,
             amount = BigDecimal.valueOf(amount),
+            categoryId = categoryId,
             title = title,
             description = description,
             dateTime = Instant.ofEpochMilli(dateTimeMillis),
@@ -243,6 +272,8 @@ class SmsReceiver : BroadcastReceiver() {
     }
 
     companion object {
+        const val FEE_CATEGORY = "Fees"
+
         // Shared by every SmsReceiver, since Android creates a new one for each broadcast
         private val balanceLock = Mutex()
     }

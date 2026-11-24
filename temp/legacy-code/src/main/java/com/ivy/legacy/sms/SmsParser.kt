@@ -5,6 +5,7 @@ import android.net.Uri
 import android.provider.ContactsContract
 import com.ivy.base.model.TransactionType
 import com.ivy.legacy.Constants
+import java.math.BigDecimal
 import java.security.MessageDigest
 import java.time.DateTimeException
 import java.time.Instant
@@ -27,6 +28,12 @@ data class SmsParsingRules(
     val dateTimeRegex: String? = null,
     val descriptionRegex: String? = null,
     val balanceRegex: String? = null,
+    val feeRegex: String? = null,
+    // The account's Capture menu. A field that's off isn't used, even when a pattern finds it.
+    val captureDate: Boolean = true,
+    val captureDescription: Boolean = true,
+    val captureBalance: Boolean = true,
+    val captureFee: Boolean = false,
 )
 
 /**
@@ -39,6 +46,7 @@ enum class SmsGroup(val key: String, val fieldLabel: String?) {
     AMOUNT("amount", "amount"),
     BALANCE("balance", "balance"),
     DESCRIPTION("description", "description"),
+    FEE("fee", "fee"),
     INCOME("income", null),
     EXPENSE("expense", null),
     DAY("day", "date/time"),
@@ -114,6 +122,8 @@ data class ParsedSmsTransaction(
     val description: String?,
     /** The account balance the SMS reports after this transaction, if a pattern found one. */
     val balance: Double?,
+    /** A fee a pattern found, saved as its own expense. Null when there's none or fee capture is off. */
+    val fee: Double? = null,
 )
 
 /**
@@ -121,6 +131,7 @@ data class ParsedSmsTransaction(
  * why a message did or didn't become a transaction.
  */
 data class SmsParseResult(
+    val rules: SmsParsingRules,
     val useMultiRegex: Boolean,
     val master: SmsRegexStep,
     // The steps below only run in multi-regex mode.
@@ -130,14 +141,16 @@ data class SmsParseResult(
     val expenseStep: SmsRegexStep? = null,
     val dateTimeStep: SmsRegexStep? = null,
     val descriptionStep: SmsRegexStep? = null,
+    val feeStep: SmsRegexStep? = null,
 
+    // What the patterns found. The transaction only uses what the Capture menu turns on.
     // A source is null when no pattern gave the value.
     val amountText: String?,
     val amountSource: SmsValueSource?,
     val amount: Double?,
     val type: TransactionType,
     val typeSource: SmsTypeSource,
-    /** Date read from the SMS text. Null means the receive time is used. */
+    /** Date read from the SMS text. */
     val parsedDateTimeMillis: Long?,
     val dateTimeSource: SmsValueSource?,
     /** Why a date pattern that matched didn't give a date. */
@@ -147,6 +160,9 @@ data class SmsParseResult(
     /** Description from the description regex, before the balance is appended. */
     val description: String?,
     val descriptionSource: SmsValueSource?,
+    /** Every fee value found, added up. Null when there's none or one isn't a number. */
+    val fee: Double? = null,
+    val feeSource: SmsValueSource? = null,
 
     /** The transaction the receiver would save, or null when [failure] says why not. */
     val transaction: ParsedSmsTransaction?,
@@ -199,6 +215,7 @@ object SmsParser {
         val expenseStep = fieldStep(rules.expenseRegex, emptySet())
         val dateTimeStep = fieldStep(rules.dateTimeRegex, SmsGroup.DATE_TIME)
         val descriptionStep = fieldStep(rules.descriptionRegex, setOf(SmsGroup.DESCRIPTION), allMatches = true)
+        val feeStep = fieldStep(rules.feeRegex, setOf(SmsGroup.FEE), allMatches = true)
 
         // Each value comes from its own pattern, then from the master pattern. Without named
         // groups, master group 1 is the amount and the master gives nothing else.
@@ -245,7 +262,20 @@ object SmsParser {
             master.named(SmsGroup.BALANCE).firstOrNull(),
         )
 
+        // Fee adds up every value, so a service charge and its VAT become one fee: every group of
+        // every match, or only the fee groups if there are names.
+        val fieldFee = feeStep?.let { step ->
+            step.matches.flatMap { match ->
+                if (step.usesNames) step.named(SmsGroup.FEE, match) else match.groups.filterNotNull()
+            }
+        }
+        val (feeParts, feeSource) = pick(
+            fieldFee?.takeIf { it.isNotEmpty() },
+            master.named(SmsGroup.FEE).takeIf { it.isNotEmpty() },
+        )
+
         return SmsParseResult(
+            rules = rules,
             useMultiRegex = multi,
             master = master,
             amountStep = amountStep,
@@ -254,6 +284,7 @@ object SmsParser {
             expenseStep = expenseStep,
             dateTimeStep = dateTimeStep,
             descriptionStep = descriptionStep,
+            feeStep = feeStep,
             amountText = amountText,
             amountSource = amountSource,
             amount = amount,
@@ -266,6 +297,8 @@ object SmsParser {
             balanceSource = balanceSource,
             description = descriptionLines?.joinToString("\n"),
             descriptionSource = descriptionSource,
+            fee = feeParts?.sumAmounts(),
+            feeSource = feeSource,
             transaction = null,
             failure = null,
         ).withOutcome(body, accountName, receivedAtMillis)
@@ -282,14 +315,16 @@ object SmsParser {
         accountName: String,
         receivedAtMillis: Long,
     ): SmsParseResult {
+        // A broken pattern for a field the Capture menu turned off doesn't stop the transaction.
         val invalidStep = listOfNotNull(
             "Master" to master,
             amountStep?.let { "Amount" to it },
-            balanceStep?.let { "Balance" to it },
+            balanceStep?.takeIf { rules.captureBalance }?.let { "Balance" to it },
             incomeStep?.let { "Income" to it },
             expenseStep?.let { "Expense" to it },
-            dateTimeStep?.let { "Date/time" to it },
-            descriptionStep?.let { "Description" to it },
+            dateTimeStep?.takeIf { rules.captureDate }?.let { "Date/time" to it },
+            descriptionStep?.takeIf { rules.captureDescription }?.let { "Description" to it },
+            feeStep?.takeIf { rules.captureFee }?.let { "Fee" to it },
         ).firstOrNull { (_, step) -> step.error != null }
 
         val failure = when {
@@ -300,19 +335,26 @@ object SmsParser {
         }
         if (failure != null) return copy(failure = failure)
 
-        val finalDescription = if (balance != null) {
-            if (!description.isNullOrBlank()) "$description\n(Bal: $balance)" else "(Bal: $balance)"
+        val capturedDescription = description.takeIf { rules.captureDescription }
+        val capturedBalance = balance.takeIf { rules.captureBalance }
+        val finalDescription = if (capturedBalance != null) {
+            if (!capturedDescription.isNullOrBlank()) {
+                "$capturedDescription\n(Bal: $capturedBalance)"
+            } else {
+                "(Bal: $capturedBalance)"
+            }
         } else {
-            description
+            capturedDescription
         }
         return copy(
             transaction = ParsedSmsTransaction(
                 amount = amount!!,
                 type = type,
-                dateTimeMillis = parsedDateTimeMillis ?: receivedAtMillis,
+                dateTimeMillis = parsedDateTimeMillis?.takeIf { rules.captureDate } ?: receivedAtMillis,
                 title = title(type, accountName, body),
                 description = finalDescription,
-                balance = balance.toAmount(),
+                balance = capturedBalance.toAmount(),
+                fee = fee?.takeIf { rules.captureFee && it > 0.0 },
             )
         )
     }
@@ -404,6 +446,12 @@ object SmsParser {
     private fun String?.orNullIfBlank(): String? = this?.takeIf { it.isNotBlank() }
 
     private fun String?.toAmount(): Double? = this?.replace(",", "")?.toDoubleOrNull()
+
+    /** The values added up, or null when one of them isn't a number. */
+    private fun List<String>.sumAmounts(): Double? {
+        val parts = map { it.replace(",", "").toBigDecimalOrNull() }
+        return parts.takeIf { null !in it }?.filterNotNull()?.fold(BigDecimal.ZERO, BigDecimal::add)?.toDouble()
+    }
 
     /** Like [SmsRegexStep.named], but a pattern without named groups gives its group 1. */
     private fun SmsRegexStep.namedOrFirst(group: SmsGroup): String? =
@@ -518,6 +566,9 @@ object SmsParser {
         val typePrefix = if (type == TransactionType.INCOME) "IN" else "OUT"
         return "AUTO $typePrefix $accountName ${generateHash(body)}"
     }
+
+    /** Title of the fee expense saved next to the SMS's transaction, sharing its code. */
+    fun feeTitle(accountName: String, body: String): String = "AUTO FEE $accountName ${generateHash(body)}"
 
     private fun generateHash(text: String): String {
         return MessageDigest.getInstance("MD5")

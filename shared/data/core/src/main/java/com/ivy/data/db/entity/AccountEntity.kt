@@ -59,6 +59,20 @@ data class AccountEntity(
     @SerialName("smsCaptureLocation")
     @ColumnInfo(defaultValue = "1")
     val smsCaptureLocation: Boolean = true,
+    @SerialName("smsFeeRegex")
+    val smsFeeRegex: String? = null,
+    @SerialName("smsCaptureDate")
+    @ColumnInfo(defaultValue = "1")
+    val smsCaptureDate: Boolean = true,
+    @SerialName("smsCaptureFee")
+    @ColumnInfo(defaultValue = "0")
+    val smsCaptureFee: Boolean = false,
+    @SerialName("smsCaptureDescription")
+    @ColumnInfo(defaultValue = "1")
+    val smsCaptureDescription: Boolean = true,
+    @SerialName("smsCaptureBalance")
+    @ColumnInfo(defaultValue = "1")
+    val smsCaptureBalance: Boolean = true,
 
     @Deprecated("Obsolete field used for cloud sync. Can't be deleted because of backwards compatibility")
     @SerialName("isSynced")
