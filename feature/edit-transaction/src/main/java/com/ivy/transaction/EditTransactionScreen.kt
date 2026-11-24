@@ -429,9 +429,7 @@ private fun BoxWithConstraintsScope.UI(
         Spacer(Modifier.height(16.dp))
 
         Toolbar(
-            // Setting the transaction type to TransactionType.TRANSFER for transactions associated
-            // with loan record to hide the ChangeTransactionType Button
-            type = if (loanData.isLoanRecord) TransactionType.TRANSFER else transactionType,
+            type = transactionType,
             initialTransactionId = screen.initialTransactionId,
             onDeleteTrnModal = {
                 deleteTrnModalVisible = true
@@ -440,7 +438,9 @@ private fun BoxWithConstraintsScope.UI(
                 changeTransactionTypeModalVisible = true
             },
             showDuplicateButton = true,
-            onDuplicate = onDuplicate
+            onDuplicate = onDuplicate,
+            // A loan record's type is set by the loan
+            showChangeTypeButton = !loanData.isLoanRecord
         )
 
         Spacer(Modifier.height(32.dp))
@@ -750,7 +750,8 @@ private fun BoxWithConstraintsScope.UI(
 
     ChangeTransactionTypeModal(
         visible = changeTransactionTypeModalVisible,
-        includeTransferType = true,
+        // A loan's own transaction is its borrowed or lent money, which can't be a transfer
+        includeTransferType = !loanData.isLoan,
         initialType = transactionType,
         dismiss = {
             changeTransactionTypeModalVisible = false

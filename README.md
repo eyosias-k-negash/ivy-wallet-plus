@@ -16,6 +16,7 @@ Ivy Wallet Plus builds on the Ivy Wallet money manager. It adds:
 - [Account balance on any day](#account-balance-on-any-day) in an account's history
 - [Alerts for overdue planned payments](#overdue-planned-payment-alerts)
 - [Planned payments in budgets](#planned-payments-in-budgets), shown as a lighter fill
+- [Changing a transaction's type](#changing-a-transactions-type) between income, expense and transfer, keeping its details
 - A [tidier reports filter](#reports-filter)
 - The [Ivy Wallet+ name and logo](#ivy-wallet-name-and-logo)
 
@@ -115,6 +116,21 @@ Every morning at 9:00, the app checks for planned payments that are past their d
 ## Planned payments in budgets
 
 On the Budgets screen, each budget's bar also counts the month's planned expenses that are still unpaid, including overdue ones. What you've spent is the solid fill. Planned payments follow it as a lighter fill, so the empty part is what's free to spend. The bar takes its color from spent plus planned, so it turns orange or red before the payments land. The amount reads **Free to spend**, or **Planned exceeds budget by** when the planned payments would take you over. Once a payment is paid, it moves from the lighter fill to the solid one. Budgets with no planned payments look the same as before.
+
+## Changing a transaction's type
+
+On the transaction screen, tap the type button at the top (**Income**, **Expense** or **Transfer**) and pick another type. Ivy Wallet showed no such button on transfers, so a transfer couldn't be changed back. The title, date, category, description, tags, attachment and location stay as they are. The account moves to where the new type needs it:
+
+| From | To | Accounts |
+|---|---|---|
+| Income | Transfer | The account becomes the destination. Pick the account the money came from. |
+| Expense | Transfer | The account stays the source. Pick the destination. |
+| Transfer | Income | The destination becomes the account, with the amount it received. |
+| Transfer | Expense | The source stays the account, with the amount it sent. |
+
+Until you pick the missing account, the app asks for it and the transfer can't be saved, so an existing transaction keeps its old type. If you switch back before picking one, the original account comes back. When an income becomes a transfer, the destination keeps receiving the income's amount. If the source is in another currency, the amount sent is worked out from it at the current exchange rate. Changing either account or the rate on the exchange-rate card works it out again. Once you type the amount sent yourself, the transfer works like any other: the amount sent stays and the amount received follows the rate.
+
+A loan's own transaction can't become a transfer, and a loan record's type still can't be changed.
 
 ## Reports filter
 
