@@ -789,6 +789,7 @@ fun BoxWithConstraintsScope.AccountModal(
     SmsSamplePickerModal(
         visible = smsSamplePickerVisible,
         senderFilter = smsSenderPhone.text,
+        subscriptionId = smsSubscriptionIdText.text.toIntOrNull(),
         dismiss = { smsSamplePickerVisible = false },
         onPick = { sender, subscriptionId ->
             smsSenderPhone = TextFieldValue(sender)

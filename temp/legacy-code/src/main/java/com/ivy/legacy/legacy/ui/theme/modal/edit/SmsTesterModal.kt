@@ -121,7 +121,9 @@ fun BoxScope.SmsTesterModal(
     var loadError by remember { mutableStateOf<String?>(null) }
     var selected by remember(sessionKey) { mutableStateOf<InboxSms?>(null) }
     var query by remember(sessionKey) { mutableStateOf(TextFieldValue("")) }
-    var onlyFromSender by remember(sessionKey) { mutableStateOf(senderFilter.isNotBlank()) }
+    var onlyMatching by remember(sessionKey) {
+        mutableStateOf(senderFilter.isNotBlank() || subscriptionId != null)
+    }
     val listState = rememberLazyListState()
 
     val result = remember(selected, rules, accountName) {
@@ -205,8 +207,9 @@ fun BoxScope.SmsTesterModal(
                 query = query,
                 onQueryChange = { query = it },
                 senderFilter = senderFilter,
-                onlyFromSender = onlyFromSender,
-                onOnlyFromSenderChange = { onlyFromSender = it },
+                subscriptionId = subscriptionId,
+                onlyMatching = onlyMatching,
+                onOnlyMatchingChange = { onlyMatching = it },
                 listState = listState,
                 onSelect = { selected = it }
             )
@@ -286,8 +289,10 @@ internal fun ColumnScope.SmsPicker(
     query: TextFieldValue,
     onQueryChange: (TextFieldValue) -> Unit,
     senderFilter: String,
-    onlyFromSender: Boolean,
-    onOnlyFromSenderChange: (Boolean) -> Unit,
+    /** The account's SIM. Null when the account accepts SMS on any SIM. */
+    subscriptionId: Int?,
+    onlyMatching: Boolean,
+    onOnlyMatchingChange: (Boolean) -> Unit,
     listState: LazyListState,
     onSelect: (InboxSms) -> Unit,
 ) {
@@ -300,30 +305,39 @@ internal fun ColumnScope.SmsPicker(
         onValueChanged = onQueryChange
     )
 
-    if (senderFilter.isNotBlank()) {
+    val context = LocalContext.current
+    val simLabels = remember(inbox) { loadSimLabels(context) }
+    // e.g. `from senders matching "Bank" on Carrier (2)`
+    val matchingText = listOfNotNull(
+        senderFilter.takeIf { it.isNotBlank() }?.let { "from senders matching \"$it\"" },
+        subscriptionId?.let { "on ${simLabels[it] ?: formatSim(context, info = null, subId = it, phone = null)}" },
+    ).joinToString(" ")
+
+    if (matchingText.isNotEmpty()) {
         Spacer(Modifier.height(12.dp))
         IvyCheckboxWithText(
             modifier = Modifier.padding(start = 16.dp),
-            text = "Only senders matching \"$senderFilter\"",
-            checked = onlyFromSender,
-            onCheckedChange = onOnlyFromSenderChange
+            text = "Only SMS $matchingText",
+            checked = onlyMatching,
+            onCheckedChange = onOnlyMatchingChange
         )
     }
 
     Spacer(Modifier.height(8.dp))
 
-    val context = LocalContext.current
-    val simLabels = remember(inbox) { loadSimLabels(context) }
     val q = query.text.trim()
-    val filtered = remember(inbox, q, onlyFromSender, senderFilter) {
+    val filtered = remember(inbox, q, onlyMatching, senderFilter, subscriptionId) {
         inbox.orEmpty().filter { sms ->
-            val senderOk = !onlyFromSender || senderFilter.isBlank() ||
+            val senderOk = !onlyMatching || senderFilter.isBlank() ||
                 SmsParser.senderMatches(senderFilter, sms.address, sms.contactName)
+            // SMS without SIM info stay, since they may have come in on the account's SIM.
+            val simOk = !onlyMatching || subscriptionId == null || sms.knownSubscriptionId == null ||
+                sms.knownSubscriptionId == subscriptionId
             val queryOk = q.isEmpty() ||
                 sms.address.contains(q, ignoreCase = true) ||
                 sms.contactName?.contains(q, ignoreCase = true) == true ||
                 sms.body.contains(q, ignoreCase = true)
-            senderOk && queryOk
+            senderOk && simOk && queryOk
         }
     }
 
@@ -331,8 +345,8 @@ internal fun ColumnScope.SmsPicker(
         loadError != null -> loadError
         inbox == null -> "Loading messages…"
         inbox.isEmpty() -> "Your SMS inbox is empty."
-        filtered.isEmpty() && onlyFromSender ->
-            "No SMS from a sender matching \"$senderFilter\". Untick the box to see every SMS."
+        filtered.isEmpty() && onlyMatching && matchingText.isNotEmpty() ->
+            "No SMS $matchingText. Untick the box to see every SMS."
         filtered.isEmpty() -> "No SMS matches your search."
         else -> null
     }

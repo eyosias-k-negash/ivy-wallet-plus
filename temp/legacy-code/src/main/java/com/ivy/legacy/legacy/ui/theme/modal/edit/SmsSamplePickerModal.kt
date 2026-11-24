@@ -34,6 +34,7 @@ import java.util.UUID
 fun BoxScope.SmsSamplePickerModal(
     visible: Boolean,
     senderFilter: String,
+    subscriptionId: Int?,
     dismiss: () -> Unit,
     /** [subscriptionId] is null when the phone didn't record which SIM the SMS came in on. */
     onPick: (sender: String, subscriptionId: Int?) -> Unit,
@@ -44,13 +45,13 @@ fun BoxScope.SmsSamplePickerModal(
     var inbox by remember { mutableStateOf<List<InboxSms>?>(null) }
     var loadError by remember { mutableStateOf<String?>(null) }
     var query by remember { mutableStateOf(TextFieldValue("")) }
-    var onlyFromSender by remember { mutableStateOf(false) }
+    var onlyMatching by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
     LaunchedEffect(visible) {
         if (!visible) return@LaunchedEffect
         query = TextFieldValue("")
-        onlyFromSender = senderFilter.isNotBlank()
+        onlyMatching = senderFilter.isNotBlank() || subscriptionId != null
         try {
             inbox = withContext(Dispatchers.IO) { loadInboxSms(context) }
             loadError = null
@@ -88,8 +89,9 @@ fun BoxScope.SmsSamplePickerModal(
             query = query,
             onQueryChange = { query = it },
             senderFilter = senderFilter,
-            onlyFromSender = onlyFromSender,
-            onOnlyFromSenderChange = { onlyFromSender = it },
+            subscriptionId = subscriptionId,
+            onlyMatching = onlyMatching,
+            onOnlyMatchingChange = { onlyMatching = it },
             listState = listState,
             onSelect = { sms ->
                 onPick(sms.address, sms.knownSubscriptionId)
