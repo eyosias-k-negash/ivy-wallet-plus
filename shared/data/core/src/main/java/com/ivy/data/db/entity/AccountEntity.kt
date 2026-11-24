@@ -26,6 +26,8 @@ data class AccountEntity(
     val orderNum: Double = 0.0,
     @SerialName("includeInBalance")
     val includeInBalance: Boolean = true,
+    @SerialName("description")
+    val description: String? = null,
 
     @SerialName("smsAutoListenEnabled")
     @ColumnInfo(defaultValue = "0")

@@ -10,6 +10,7 @@ data class CreateAccountData(
     val icon: String?,
     val balance: Double,
     val includeBalance: Boolean = true,
+    val description: String? = null,
 
     val smsAutoListenEnabled: Boolean = false,
     val smsSenderPhone: String? = null,

@@ -19,6 +19,7 @@ data class Account(
     val icon: IconAsset?,
     val includeInBalance: Boolean,
     override val orderNum: Double,
+    val description: String? = null,
 
     val smsAutoListenEnabled: Boolean = false,
     val smsSenderPhone: String? = null,

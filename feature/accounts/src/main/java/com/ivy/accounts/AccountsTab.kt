@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -296,6 +297,21 @@ private fun AccountHeader(
                     )
                 )
             }
+        }
+
+        account.description?.takeIf { it.isNotBlank() }?.let { description ->
+            Spacer(Modifier.height(4.dp))
+
+            Text(
+                modifier = Modifier.padding(horizontal = 20.dp),
+                text = description,
+                style = UI.typo.c.style(
+                    color = contrastColor,
+                    fontWeight = FontWeight.Medium
+                ),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
         }
 
         Spacer(Modifier.height(4.dp))

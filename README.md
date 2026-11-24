@@ -14,6 +14,7 @@ Ivy Wallet Plus builds on the Ivy Wallet money manager. It adds:
 - [Out-of-sync warnings](#out-of-sync-warnings) when a bank SMS reports a different balance
 - [Locations](#locations) on transactions
 - [Account balance on any day](#account-balance-on-any-day) in an account's history
+- [Account descriptions](#account-descriptions)
 - [Alerts for overdue planned payments](#overdue-planned-payment-alerts)
 - [Planned payments in budgets](#planned-payments-in-budgets), shown as a lighter fill
 - [Changing a transaction's type](#changing-a-transactions-type) between income, expense and transfer, keeping its details
@@ -112,6 +113,10 @@ Each account has at most one warning. The next SMS for the account replaces it, 
 ## Account balance on any day
 
 Open an account's transaction list and tap a day's date header. That day and every newer day then show the account's end-of-day balance (`Bal: …`) instead of the day's cash flow. Tap the same day again to switch back.
+
+## Account descriptions
+
+Each account can have a description, for example what the account is for or who shares it. Type it under the account's name when you create or edit an account. It shows under the name on the Accounts tab, cut to two lines, and in full at the top of the account's screen. Clearing the text removes it. Descriptions are kept in backups.
 
 ## Overdue planned payment alerts
 

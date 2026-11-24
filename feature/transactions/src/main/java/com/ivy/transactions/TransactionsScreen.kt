@@ -642,6 +642,23 @@ private fun Header(
             showCategoryModal = showCategoryModal
         )
 
+        account?.description?.takeIf { it.isNotBlank() }?.let { description ->
+            Spacer(Modifier.height(4.dp))
+
+            Text(
+                modifier = Modifier
+                    .padding(horizontal = 32.dp)
+                    .testTag("account_description"),
+                text = description,
+                style = UI.typo.b2.style(
+                    color = contrastColor,
+                    fontWeight = FontWeight.Medium
+                )
+            )
+
+            Spacer(Modifier.height(8.dp))
+        }
+
         BalanceRow(
             modifier = Modifier
                 .padding(start = 32.dp)
