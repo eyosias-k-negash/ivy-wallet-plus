@@ -44,6 +44,14 @@ class SmsParserTest {
             .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
         result.typeSource shouldBe SmsTypeSource.EXPENSE_REGEX
         result.amountSource shouldBe SmsAmountSource.AMOUNT_REGEX
+        transaction.balance shouldBe 8400.5
+    }
+
+    @Test
+    fun `no balance without a balance match`() {
+        val result = parse(multiRules.copy(balanceRegex = "Available ([0-9.]+)"))
+
+        result.transaction!!.balance shouldBe null
     }
 
     @Test
@@ -95,6 +103,7 @@ class SmsParserTest {
         result.transaction!!.amount shouldBe 1250.0
         result.transaction!!.type shouldBe TransactionType.EXPENSE
         result.transaction!!.description shouldBe null
+        result.transaction!!.balance shouldBe null
     }
 
     @Test

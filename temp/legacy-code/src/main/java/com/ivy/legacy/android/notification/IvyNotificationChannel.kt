@@ -35,6 +35,13 @@ enum class IvyNotificationChannel(
         importance = NotificationManager.IMPORTANCE_HIGH,
         // Only takes effect once the user lets the app override Do Not Disturb
         bypassDnd = true
+    ),
+    ACCOUNT_OUT_OF_SYNC(
+        channelId = "account_out_of_sync",
+        channelName = "Account out of sync",
+        description = "Warnings when a bank SMS reports a different balance than the app shows.",
+        importance = NotificationManager.IMPORTANCE_HIGH,
+        bypassDnd = false
     );
 
     @SuppressLint("WrongConstant")

@@ -11,6 +11,7 @@ Ivy Wallet Plus builds on the Ivy Wallet money manager. It adds:
 
 - [Image and audio attachments](#attachments) on transactions
 - [Transactions from bank SMS](#transactions-from-bank-sms), recorded automatically
+- [Out-of-sync warnings](#out-of-sync-warnings) when a bank SMS reports a different balance
 - [Locations](#locations) on transactions
 - [Account balance on any day](#account-balance-on-any-day) in an account's history
 - [Alerts for overdue planned payments](#overdue-planned-payment-alerts)
@@ -55,7 +56,7 @@ Ivy Wallet Plus can read your bank's SMS alerts and record the transactions for 
 | Amount Extraction | The first capture group is the amount. Commas are stripped. |
 | Date/Time Extraction | Capture groups are day, month (a number or an English short name like `Jan`) and year (2 or 4 digits), optionally followed by hour, minute and second. |
 | Description Extraction | Every capture group from every match, one per line. |
-| Balance Extraction | The first capture group is added to the description as `(Bal: …)`. |
+| Balance Extraction | The first capture group is added to the description as `(Bal: …)`, and checked against the account's balance. See [Out-of-sync warnings](#out-of-sync-warnings). |
 
 Without a type match, or without multi-regex, words like "credited", "received", "deposited" or "added" make the transaction income, and anything else makes it an expense. Without a date match, the transaction is dated when the SMS arrives. An empty pattern field is ignored.
 
@@ -79,6 +80,16 @@ New lines, no-break spaces and other invisible characters show as orange markers
 - **Phone** lets the SIM list show your SIMs and their phone numbers.
 - **Contacts** lets the app match senders by contact name.
 - **Location** set to **Allow all the time** lets **Capture Location** work while the app is closed. Ticking **Capture Location**, or tapping **ALLOW LOCATION ACCESS** below it, asks for this. With **Allow only while using the app**, SMS transactions get a location only when the app is open.
+
+### Out-of-sync warnings
+
+With multi-regex and a Balance Extraction pattern, every SMS transaction is followed by a balance check. If the balance in the SMS differs from the account's balance in the app by a cent or more, an "Out of sync" notification shows both balances. Usually a transaction is missing, doubled or has the wrong amount. From the notification, you can:
+
+- **Tap it** to open Add transaction with the account, the Rebalance category (created the first time) and the difference already filled in, as income if the app shows too little or an expense if it shows too much. The difference is worked out again when you tap, so it accounts for changes you made in the meantime, like correcting the SMS transaction. If nothing is left to fix, a message says so.
+- **Fix manually** to open the account's transactions and find the problem yourself.
+- **Dismiss** it.
+
+Each account has at most one warning. The next SMS for the account replaces it, or removes it once the balances match. Warnings use their own channel, **Account out of sync**, which you can turn off in Android's notification settings for the app. Unlike "Transaction created" notifications, they don't come back after a restart.
 
 ## Locations
 

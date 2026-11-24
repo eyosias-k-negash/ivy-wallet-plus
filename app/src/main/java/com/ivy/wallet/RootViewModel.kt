@@ -4,6 +4,7 @@ import android.content.Intent
 import androidx.biometric.BiometricPrompt
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ivy.base.Toaster
 import com.ivy.base.legacy.SharedPrefs
 import com.ivy.base.legacy.Theme
 import com.ivy.base.legacy.stringRes
@@ -20,9 +21,11 @@ import com.ivy.navigation.EditTransactionScreen
 import com.ivy.navigation.MainScreen
 import com.ivy.navigation.Navigation
 import com.ivy.navigation.OnboardingScreen
+import com.ivy.navigation.TransactionsScreen
 import com.ivy.ui.R
 import com.ivy.wallet.domain.deprecated.logic.notification.TransactionReminderLogic
 import com.ivy.wallet.migrations.MigrationsManager
+import com.ivy.wallet.sms.AccountOutOfSyncNotificationManager
 import com.ivy.wallet.sms.SmsTransactionNotificationManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -48,6 +51,8 @@ class RootViewModel @Inject constructor(
     private val migrationsManager: MigrationsManager,
     private val legalRepo: LegalRepository,
     private val smsNotificationManager: SmsTransactionNotificationManager,
+    private val outOfSyncNotificationManager: AccountOutOfSyncNotificationManager,
+    private val toaster: Toaster,
 ) : ViewModel() {
 
     companion object {
@@ -60,6 +65,9 @@ class RootViewModel @Inject constructor(
         const val EXTRA_DATE_TIME = "date_time_extra"
         const val EXTRA_ACCOUNT_ID = "account_id_extra"
         const val EXTRA_TAG_IDS = "tag_ids_extra"
+        const val EXTRA_REBALANCE_ACCOUNT_ID = "rebalance_account_id_extra"
+        const val EXTRA_REBALANCE_SMS_BALANCE = "rebalance_sms_balance_extra"
+        const val EXTRA_OPEN_ACCOUNT_ID = "open_account_id_extra"
 
         const val USER_INACTIVITY_TIME_LIMIT = 60 // Time in seconds
     }
@@ -115,14 +123,14 @@ class RootViewModel @Inject constructor(
         }
     }
 
-    private fun navigateOnboardedUser(intent: Intent) {
+    private suspend fun navigateOnboardedUser(intent: Intent) {
         overduePaymentReminderLogic.scheduleReminder()
         viewModelScope.launch(Dispatchers.IO) {
             // clear notifications of payments that were settled, edited or deleted meanwhile
             overduePaymentReminderLogic.refresh()
         }
 
-        if (!handleSpecialStart(intent)) {
+        if (!handleRebalanceStart(intent) && !handleOpenAccountStart(intent) && !handleSpecialStart(intent)) {
             nav.navigateTo(MainScreen)
             transactionReminderLogic.scheduleReminder()
         }
@@ -191,6 +199,35 @@ class RootViewModel @Inject constructor(
 
         return false
     }
+
+    /** A tap on an account's out-of-sync warning opens Add transaction with the difference. */
+    private suspend fun handleRebalanceStart(intent: Intent): Boolean {
+        val accountId = intent.uuidExtra(EXTRA_REBALANCE_ACCOUNT_ID) ?: return false
+        outOfSyncNotificationManager.dismiss(accountId)
+        val screen = outOfSyncNotificationManager.rebalanceScreen(
+            accountId = accountId,
+            smsBalance = intent.getDoubleExtra(EXTRA_REBALANCE_SMS_BALANCE, 0.0)
+        )
+        if (screen != null) {
+            nav.navigateTo(screen)
+        } else {
+            toaster.show("The account already matches the bank's balance")
+        }
+        return screen != null
+    }
+
+    /** "Fix manually" on an account's out-of-sync warning opens the account's transactions. */
+    private fun handleOpenAccountStart(intent: Intent): Boolean {
+        val accountId = intent.uuidExtra(EXTRA_OPEN_ACCOUNT_ID) ?: return false
+        outOfSyncNotificationManager.dismiss(accountId)
+        // Home underneath, so Back leaves the account for the rest of the app
+        nav.navigateTo(MainScreen)
+        nav.navigateTo(TransactionsScreen(accountId = accountId, categoryId = null))
+        return true
+    }
+
+    private fun Intent.uuidExtra(name: String): UUID? =
+        getStringExtra(name)?.let { runCatching { UUID.fromString(it) }.getOrNull() }
 
     @Suppress("EmptyFunctionBlock")
     fun handleBiometricAuthResult(
