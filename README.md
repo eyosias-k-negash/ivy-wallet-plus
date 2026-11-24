@@ -69,6 +69,8 @@ Every pattern runs case-insensitive, with `DOTALL` (`.` also matches new lines) 
 
 New lines, no-break spaces and other invisible characters show as orange markers. They're often lost when you copy an SMS to a computer, which is why a pattern can work there but fail on the phone. The picked SMS stays selected, so you can edit a pattern and test again. The tester doesn't check the receiving phone number, or whether another account with a matching sender would get the SMS first.
 
+**Add an SMS by hand.** When the picked SMS gives a transaction, tap **Add transaction** at the bottom of the tester, for example for an SMS that arrived before you turned on listening. It opens a new transaction for this account, filled in with the type, amount, date, title, description and `AUTO-` tag the listener would use. Nothing is saved until you tap **Add** there. The account has to be saved first, because opening the transaction closes the account form.
+
 **What happens.** When a matching SMS arrives, the app saves the transaction to that account right away, titled `AUTO IN` or `AUTO OUT` plus the account name and a short code made from the message. It tags it `AUTO-<account name>`, a tag created when you save an account with SMS listening on. A "Transaction created" notification then lets you open the transaction to check or edit it. With **Capture Location** on, the transaction also gets the phone's location when the SMS arrived, if one is found within a few seconds.
 
 **Permissions.** **SAMPLE SMS** and the tester ask for SMS and Contacts access when you open them. **SAMPLE SMS** and the SIM list also ask for Phone access. Otherwise the app doesn't ask for these itself, so allow them in Android's settings under **Apps → Ivy Wallet+ → Permissions**:

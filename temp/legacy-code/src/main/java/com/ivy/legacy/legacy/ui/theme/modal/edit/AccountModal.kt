@@ -52,6 +52,7 @@ import com.ivy.design.l0_system.style
 import com.ivy.domain.legacy.ui.IvyColorPicker
 import com.ivy.legacy.IvyWalletPreview
 import com.ivy.legacy.datamodel.Account
+import com.ivy.legacy.sms.ParsedSmsTransaction
 import com.ivy.legacy.sms.SmsLocationAccess
 import com.ivy.legacy.sms.SmsParsingRules
 import com.ivy.legacy.utils.isNotNullOrBlank
@@ -59,6 +60,8 @@ import com.ivy.legacy.utils.onScreenStart
 import com.ivy.legacy.utils.selectEndTextFieldValue
 import com.ivy.legacy.utils.toLowerCaseLocal
 import com.ivy.legacy.utils.toUpperCaseLocal
+import com.ivy.navigation.EditTransactionScreen
+import com.ivy.navigation.navigation
 import com.ivy.ui.R
 import com.ivy.wallet.domain.data.IvyCurrency
 import com.ivy.wallet.domain.deprecated.logic.model.CreateAccountData
@@ -178,7 +181,18 @@ fun BoxWithConstraintsScope.AccountModal(
         mutableStateOf(false)
     }
 
+    // Every value that save() writes, so the form can tell whether leaving it would lose edits.
+    val formValues = listOf<Any?>(
+        nameTextFieldValue.text, color, amount, currencyCode, icon, includeInBalance,
+        smsAutoListenEnabled, smsSenderPhone.text, smsSubscriptionIdText.text, smsReceiverPhoneText.text,
+        smsParsingRegex.text, useMultiRegex, smsIncomeRegex.text, smsExpenseRegex.text, smsAmountRegex.text,
+        smsDateTimeRegex.text, smsDescriptionRegex.text, smsBalanceRegex.text, smsCaptureLocation,
+    )
+    val savedFormValues = remember(modal) { formValues }
+    val hasUnsavedChanges = formValues != savedFormValues
+
     val context = LocalContext.current
+    val nav = navigation()
     val forceNonZeroBalance = modal?.forceNonZeroBalance ?: false
 
     var hasSmsLocationAccess by remember(modal) {
@@ -722,6 +736,35 @@ fun BoxWithConstraintsScope.AccountModal(
         icon = it
     }
 
+    // Leaves for a new, unsaved transaction filled in from the tested SMS.
+    fun addSmsTransaction(savedAccount: Account, transaction: ParsedSmsTransaction) {
+        if (hasUnsavedChanges) {
+            // Opening another screen closes this form, which would silently drop the edits.
+            android.widget.Toast.makeText(
+                context,
+                "Save the account first: opening a new transaction closes this form " +
+                    "and your unsaved changes would be lost.",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+        smsTesterVisible = false
+        dismiss()
+        nav.navigateTo(
+            EditTransactionScreen(
+                initialTransactionId = null,
+                type = transaction.type,
+                accountId = savedAccount.id,
+                amount = transaction.amount,
+                title = transaction.title,
+                description = transaction.description,
+                dateTime = transaction.dateTimeMillis,
+                // Same tag the SMS receiver gives the transactions it saves.
+                tagIds = listOfNotNull(savedAccount.autoTagId),
+            )
+        )
+    }
+
     SmsTesterModal(
         visible = smsTesterVisible,
         sessionKey = modal,
@@ -738,6 +781,8 @@ fun BoxWithConstraintsScope.AccountModal(
         senderFilter = smsSenderPhone.text,
         subscriptionId = smsSubscriptionIdText.text.toIntOrNull(),
         accountName = nameTextFieldValue.text.trim(),
+        // Only a saved account can be given the transaction.
+        onAddTransaction = account?.let { savedAccount -> { addSmsTransaction(savedAccount, it) } },
         dismiss = { smsTesterVisible = false }
     )
 
