@@ -51,7 +51,9 @@ import com.ivy.design.l0_system.UI
 import com.ivy.design.l0_system.style
 import com.ivy.legacy.Constants
 import com.ivy.legacy.datamodel.Account
+import com.ivy.legacy.sms.SmsGroup
 import com.ivy.legacy.sms.SmsLocationAccess
+import com.ivy.legacy.sms.SmsParser
 import com.ivy.legacy.sms.SmsParsingRules
 import com.ivy.legacy.utils.isNotNullOrBlank
 import com.ivy.ui.R
@@ -354,9 +356,15 @@ private fun CaptureSection(state: SmsSettingsState) {
 
     val expanded = state.captureExpanded
 
-    // Only the advanced multi-regex reads anything besides the amount and type.
-    fun regexNote(regex: TextFieldValue, name: String): String? =
-        "NO $name REGEX".takeIf { state.useMultiRegex && regex.text.isBlank() }
+    // A value comes from its own regex, which only the advanced multi-regex runs, or from a
+    // same-named group in the master regex.
+    val masterGroups = remember(state.masterRegex.text) {
+        SmsParser.scanGroupNames(state.masterRegex.text).mapNotNull { it?.let(SmsGroup::of) }.toSet()
+    }
+    fun regexNote(regex: TextFieldValue, group: SmsGroup): String? {
+        val hasOwnRegex = state.useMultiRegex && regex.text.isNotBlank()
+        return "NO REGEX".takeIf { !hasOwnRegex && group !in masterGroups }
+    }
 
     val captured = listOfNotNull(
         "Location".takeIf { state.captureLocation },
@@ -375,8 +383,8 @@ private fun CaptureSection(state: SmsSettingsState) {
     ) {
         if (!state.useMultiRegex) {
             FieldHelp(
-                "Date, fee, description and balance are read with the advanced multi-regex " +
-                    "in SMS structure. Without it, only the location is captured."
+                "Without the advanced multi-regex, date, fee, description and balance only come " +
+                    "from named groups in the master regex, like (?<day>…)."
             )
             Spacer(Modifier.height(4.dp))
         }
@@ -408,37 +416,40 @@ private fun CaptureSection(state: SmsSettingsState) {
             label = "Date",
             checked = state.captureDate,
             onCheckedChange = { state.captureDate = it },
-            note = regexNote(state.dateTimeRegex, "DATE/TIME").takeIf { state.captureDate },
+            note = regexNote(state.dateTimeRegex, SmsGroup.DAY).takeIf { state.captureDate },
             details = (
-                "Dates the transaction from the SMS text, with the Date/time regex. Otherwise, " +
-                    "or when it finds no date, the transaction is dated when the SMS arrives."
+                "Dates the transaction from the SMS text, with the Date/time regex or the master's " +
+                    "day and month groups. Otherwise, or when no date is found, it's dated when the SMS arrives."
                 ).takeIf { expanded },
         )
         CaptureOption(
             label = "Fee",
             checked = state.captureFee,
             onCheckedChange = { state.captureFee = it },
-            note = regexNote(state.feeRegex, "FEE").takeIf { state.captureFee },
+            note = regexNote(state.feeRegex, SmsGroup.FEE).takeIf { state.captureFee },
             details = (
-                "Saves the fee the Fee regex finds as its own expense, in your Fees category. " +
-                    "Leave it off if the SMS amount already includes the fee."
+                "Saves the fee, from the Fee regex or the master's fee groups, as its own expense in " +
+                    "your Fees category. Leave it off if the SMS amount already includes the fee."
                 ).takeIf { expanded },
         )
         CaptureOption(
             label = "Description",
             checked = state.captureDescription,
             onCheckedChange = { state.captureDescription = it },
-            note = regexNote(state.descriptionRegex, "DESCRIPTION").takeIf { state.captureDescription },
-            details = "Fills the description from the Description regex.".takeIf { expanded },
+            note = regexNote(state.descriptionRegex, SmsGroup.DESCRIPTION)
+                .takeIf { state.captureDescription },
+            details = "Fills the description from the Description regex or the master's description groups."
+                .takeIf { expanded },
         )
         CaptureOption(
             label = "Balance & rebalance",
             checked = state.captureBalance,
             onCheckedChange = { state.captureBalance = it },
-            note = regexNote(state.balanceRegex, "BALANCE").takeIf { state.captureBalance },
+            note = regexNote(state.balanceRegex, SmsGroup.BALANCE).takeIf { state.captureBalance },
             details = (
-                "Adds the balance from the Balance regex to the description, and warns when it " +
-                    "differs from the app's balance. Tapping the warning adds the rebalancing transaction."
+                "Adds the balance, from the Balance regex or the master's balance group, to the " +
+                    "description, and warns when it differs from the app's balance. Tapping the warning " +
+                    "adds the rebalancing transaction."
                 ).takeIf { expanded },
         )
     }
@@ -500,16 +511,16 @@ private fun StructureSection(state: SmsSettingsState, onTestSms: () -> Unit) {
         IvyOutlinedTextField(
             modifier = Modifier.fieldPadding(),
             value = state.masterRegex,
-            hint = "Group 1: amount",
+            hint = "Group 1 or (?<amount>…)",
             onValueChanged = { state.masterRegex = it }
         )
         FieldHelp(
             if (state.useMultiRegex) {
-                "An SMS must match it before the advanced regexes run. Group 1 is the amount " +
-                    "when the Amount regex finds none."
+                "An SMS must match it before the advanced regexes run. Its named groups fill in " +
+                    "what those find nothing for, and its group 1 is the amount without names."
             } else {
-                "An SMS must match it. Group 1 is the amount, and words like \"credited\" or " +
-                    "\"debited\" decide the type. Empty uses a generic pattern."
+                "An SMS must match it. Group 1, or a group named amount, is the amount. Name other " +
+                    "groups, like (?<day>…), to read more. Empty uses a generic pattern."
             }
         )
 
@@ -582,34 +593,34 @@ private fun AdvancedRegexFields(state: SmsSettingsState) {
     RegexField(
         label = "Amount",
         value = state.amountRegex,
-        hint = "Group 1: amount",
+        hint = "Group 1 or (?<amount>…)",
         onValueChange = { state.amountRegex = it }
     )
     RegexField(
         label = "Date/time",
         value = state.dateTimeRegex,
-        hint = "Day, month, year (+ time)",
+        hint = "(?<day>…), (?<month>…), (?<year>…)…",
         note = notCaptured.takeIf { !state.captureDate },
         onValueChange = { state.dateTimeRegex = it }
     )
     RegexField(
         label = "Description",
         value = state.descriptionRegex,
-        hint = "Every group, one per line",
+        hint = "Every group or (?<description>…)",
         note = notCaptured.takeIf { !state.captureDescription },
         onValueChange = { state.descriptionRegex = it }
     )
     RegexField(
         label = "Balance",
         value = state.balanceRegex,
-        hint = "Group 1: balance",
+        hint = "Group 1 or (?<balance>…)",
         note = notCaptured.takeIf { !state.captureBalance },
         onValueChange = { state.balanceRegex = it }
     )
     RegexField(
         label = "Fee",
         value = state.feeRegex,
-        hint = "Every group, added up",
+        hint = "Every group or (?<fee>…), added up",
         note = notCaptured.takeIf { !state.captureFee },
         onValueChange = { state.feeRegex = it }
     )

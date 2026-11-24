@@ -47,22 +47,24 @@ Ivy Wallet Plus can read your bank's SMS alerts and record the transactions for 
    - **SAMPLE SMS** lets you pick an SMS from your bank, and fills in its sender and the SIM it came in on.
    - **Bank phone no. / contact**: tap **PICK** to choose a contact, or open **MANUAL** to type the sender's name or number. An SMS counts when its sender, or the sender's contact name, contains this text. Left empty, it matches every sender.
    - **Contact SIM no.**: optionally choose a SIM so only messages that arrive on it count. The list shows each SIM as `carrier (ID): phone number · SIM name`. The name is the one you gave the SIM in Android's settings, if any. The number only appears when Android knows it, and it's then checked as well. To type the receiving phone number and SIM slot yourself, choose **Manual Entry** or open **MANUAL**.
-2. **Capture menu** picks what a transaction gets besides its amount and type: **Location**, **Date**, **Fee**, **Description** and **Balance & rebalance**. All but **Fee** are on by default. **DETAILS** explains each one. Date, fee, description and balance are read by the advanced multi-regex, and a tag shows when the pattern a ticked box needs is empty. See [Locations](#locations) and [Out-of-sync warnings](#out-of-sync-warnings).
+2. **Capture menu** picks what a transaction gets besides its amount and type: **Location**, **Date**, **Fee**, **Description** and **Balance & rebalance**. All but **Fee** are on by default. **DETAILS** explains each one. Date, fee, description and balance come from their own patterns or from named groups in the master pattern. A **NO REGEX** tag shows when neither can give a ticked value. See [Locations](#locations) and [Out-of-sync warnings](#out-of-sync-warnings).
 3. **SMS structure** holds the patterns. **IMPORT CONFIG** loads them all from a JSON file with any of these keys: `masterMatch`, `useMultiRegex`, `incomeRegex`, `expenseRegex`, `amountRegex`, `dateTimeRegex`, `descriptionRegex`, `balanceRegex` and `feeRegex`.
-   - **Simple** has the **Master regex**, always shown. A message must match it, and its first capture group is read as the amount. If you leave it empty, a generic pattern is used, but you'll usually need one that fits your bank's wording.
+   - **Simple** has the **Master regex**, always shown. A message must match it, and its first capture group, or a group named `amount`, is read as the amount. If you leave it empty, a generic pattern is used, but you'll usually need one that fits your bank's wording.
    - **MANUAL** reveals **Use advanced multi-regex**, which turns on the separate patterns below. **HIDE** and **SHOW** fold them away. A pattern whose box is off in the Capture menu is tagged **OFF IN CAPTURE MENU**.
    - **TEST WITH AN SMS**, at the bottom, tries the patterns on a real SMS.
 
 | Pattern | What it does |
 |---|---|
 | Income / Expense identification | If either matches anywhere in the message, it sets the transaction type. |
-| Amount | The first capture group is the amount. Commas are stripped. |
-| Date/time | Capture groups are day, month (a number or an English short name like `Jan`) and year (2 or 4 digits), optionally followed by hour, minute and second. Used when **Date** is on. |
-| Description | Every capture group from every match, one per line. Used when **Description** is on. |
-| Balance | The first capture group is added to the description as `(Bal: …)`, and checked against the account's balance. Used when **Balance & rebalance** is on. See [Out-of-sync warnings](#out-of-sync-warnings). |
-| Fee | Every capture group from every match is added up, so a service charge and its VAT become one fee. Used when **Fee** is on: see below. |
+| Amount | The `amount` group is the amount. Commas are stripped. |
+| Date/time | Groups named `day`, `month` (a number or an English name like `Jan`), `year` (2 or 4 digits), `hour`, `minute`, `second` and `ampm`, in any order. Only day and month are required. Used when **Date** is on. |
+| Description | Every `description` group from every match, one per line. Used when **Description** is on. |
+| Balance | The `balance` group is added to the description as `(Bal: …)`, and checked against the account's balance. Used when **Balance & rebalance** is on. See [Out-of-sync warnings](#out-of-sync-warnings). |
+| Fee | Every `fee` group from every match is added up, so a service charge and its VAT become one fee. Used when **Fee** is on: see below. |
 
-Without a type match, or without multi-regex, words like "credited", "received", "deposited" or "added" make the transaction income, and anything else makes it an expense. Without a date match, or with **Date** off, the transaction is dated when the SMS arrives. An empty pattern field is ignored, and so is an invalid pattern whose box is off in the Capture menu.
+**Named groups** like `(?<day>\d{2})` let the values come in any order, so one pattern can read dates written as `20/11/2026` in one SMS and `2026-11-21` in the next. The master pattern can name values too. They're used when a value's own pattern is empty or finds nothing, and in single-regex mode. Patterns without named groups still work by position: group 1 is the amount or balance, the date groups are day, month, year, hour, minute and second, and the description and fee take every group. [Writing SMS patterns](docs/SMS-Patterns.md) lists every name, with examples and tips for sharing a config.
+
+Without a type match, words like "credited", "received", "deposited" or "added" make the transaction income, and anything else makes it an expense. Without a date match, or with **Date** off, the transaction is dated when the SMS arrives. An empty pattern field is ignored, and so is an invalid pattern whose box is off in the Capture menu.
 
 Every pattern runs case-insensitive, with `DOTALL` (`.` also matches new lines) and `MULTILINE` (`^` and `$` match at each line). A long SMS that arrives in several parts is read as one message.
 
@@ -91,7 +93,7 @@ New lines, no-break spaces and other invisible characters show as orange markers
 
 ### Out-of-sync warnings
 
-With **Balance & rebalance** on in the Capture menu, multi-regex and a Balance pattern, every SMS transaction (and its fee) is followed by a balance check. If the balance in the SMS differs from the account's balance in the app by a cent or more, an "Out of sync" notification shows both balances. Usually a transaction is missing, doubled or has the wrong amount. From the notification, you can:
+When a pattern reads the balance from the SMS and **Balance & rebalance** is on in the Capture menu, every SMS transaction (and its fee) is followed by a balance check. If the balance in the SMS differs from the account's balance in the app by a cent or more, an "Out of sync" notification shows both balances. Usually a transaction is missing, doubled or has the wrong amount. From the notification, you can:
 
 - **Tap it** to open Add transaction with the account, your Rebalance category (reused if you have one, otherwise created) and the difference already filled in, as income if the app shows too little or an expense if it shows too much. The difference is worked out again when you tap, so it accounts for changes you made in the meantime, like correcting the SMS transaction. If nothing is left to fix, a message says so.
 - **Fix manually** to open the account's transactions and find the problem yourself.
