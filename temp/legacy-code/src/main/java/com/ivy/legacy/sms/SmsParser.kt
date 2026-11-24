@@ -6,8 +6,13 @@ import android.provider.ContactsContract
 import com.ivy.base.model.TransactionType
 import com.ivy.legacy.Constants
 import java.security.MessageDigest
-import java.text.DateFormatSymbols
-import java.util.Calendar
+import java.time.DateTimeException
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.Month
+import java.time.YearMonth
+import java.time.ZoneId
+import java.time.format.TextStyle
 import java.util.Locale
 import java.util.regex.Pattern
 import java.util.regex.PatternSyntaxException
@@ -24,6 +29,40 @@ data class SmsParsingRules(
     val balanceRegex: String? = null,
 )
 
+/**
+ * Names the parser reads from named groups, like `(?<amount>[\d,.]+)`.
+ *
+ * Java doesn't allow the same name twice in one pattern, so a name may end in digits:
+ * `(?<day>\d\d)/(?<month>\d\d)|(?<month2>\d\d)-(?<day2>\d\d)` reads either layout.
+ */
+enum class SmsGroup(val key: String, val fieldLabel: String?) {
+    AMOUNT("amount", "amount"),
+    BALANCE("balance", "balance"),
+    DESCRIPTION("description", "description"),
+    INCOME("income", null),
+    EXPENSE("expense", null),
+    DAY("day", "date/time"),
+    MONTH("month", "date/time"),
+    YEAR("year", "date/time"),
+    HOUR("hour", "date/time"),
+    MINUTE("minute", "date/time"),
+    SECOND("second", "date/time"),
+    AMPM("ampm", "date/time");
+
+    companion object {
+        val DATE_TIME = setOf(DAY, MONTH, YEAR, HOUR, MINUTE, SECOND, AMPM)
+
+        /** Date/time groups in a pattern without named groups, in group order. */
+        val POSITIONAL_DATE_TIME = listOf(DAY, MONTH, YEAR, HOUR, MINUTE, SECOND)
+
+        /** The group a name stands for, ignoring case and trailing digits, or null if the parser doesn't read it. */
+        fun of(name: String): SmsGroup? {
+            val key = name.trimEnd { it.isDigit() }.lowercase()
+            return entries.firstOrNull { it.key == key }
+        }
+    }
+}
+
 data class SmsRegexMatch(
     val value: String,
     val range: IntRange,
@@ -37,15 +76,35 @@ data class SmsRegexStep(
     val matches: List<SmsRegexMatch> = emptyList(),
     /** Set when [regex] doesn't compile. */
     val error: String? = null,
+    /**
+     * Name of each capturing group, null for an unnamed one. Empty when the pattern has no named
+     * groups: its values are then read by group position, as before named groups were supported.
+     */
+    val groupNames: List<String?> = emptyList(),
+    /** Named groups that are ignored, e.g. a misspelled name. */
+    val warnings: List<String> = emptyList(),
 ) {
     val isSet: Boolean get() = regex != null
     val matched: Boolean get() = matches.isNotEmpty()
     val firstGroup: String? get() = matches.firstOrNull()?.groups?.firstOrNull()
+    val usesNames: Boolean get() = groupNames.isNotEmpty()
 }
 
-enum class SmsAmountSource { AMOUNT_REGEX, MASTER_REGEX }
+/** Values of the groups named after [group] that took part in [match], in pattern order. */
+fun SmsRegexStep.named(group: SmsGroup, match: SmsRegexMatch? = matches.firstOrNull()): List<String> {
+    if (match == null) return emptyList()
+    return groupNames.indices.mapNotNull { i ->
+        match.groups.getOrNull(i)?.takeIf { groupNames[i]?.let(SmsGroup::of) == group }
+    }
+}
 
-enum class SmsTypeSource { INCOME_REGEX, EXPENSE_REGEX, KEYWORDS }
+fun SmsRegexStep.hasGroupFor(groups: Set<SmsGroup>): Boolean =
+    groupNames.any { name -> name?.let(SmsGroup::of) in groups }
+
+/** Which pattern a value was read from. */
+enum class SmsValueSource { FIELD_REGEX, MASTER_REGEX }
+
+enum class SmsTypeSource { INCOME_REGEX, EXPENSE_REGEX, MASTER_REGEX, KEYWORDS }
 
 data class ParsedSmsTransaction(
     val amount: Double,
@@ -53,7 +112,7 @@ data class ParsedSmsTransaction(
     val dateTimeMillis: Long,
     val title: String,
     val description: String?,
-    /** The account balance the SMS reports after this transaction, if the balance regex found one. */
+    /** The account balance the SMS reports after this transaction, if a pattern found one. */
     val balance: Double?,
 )
 
@@ -72,16 +131,22 @@ data class SmsParseResult(
     val dateTimeStep: SmsRegexStep? = null,
     val descriptionStep: SmsRegexStep? = null,
 
+    // A source is null when no pattern gave the value.
     val amountText: String?,
-    val amountSource: SmsAmountSource,
+    val amountSource: SmsValueSource?,
     val amount: Double?,
     val type: TransactionType,
     val typeSource: SmsTypeSource,
     /** Date read from the SMS text. Null means the receive time is used. */
     val parsedDateTimeMillis: Long?,
+    val dateTimeSource: SmsValueSource?,
+    /** Why a date pattern that matched didn't give a date. */
+    val dateTimeProblem: String?,
     val balance: String?,
+    val balanceSource: SmsValueSource?,
     /** Description from the description regex, before the balance is appended. */
     val description: String?,
+    val descriptionSource: SmsValueSource?,
 
     /** The transaction the receiver would save, or null when [failure] says why not. */
     val transaction: ParsedSmsTransaction?,
@@ -91,6 +156,13 @@ data class SmsParseResult(
 object SmsParser {
     const val FLAGS = Pattern.CASE_INSENSITIVE or Pattern.DOTALL or Pattern.MULTILINE
     const val FLAGS_LABEL = "CASE_INSENSITIVE, DOTALL, MULTILINE"
+
+    private const val NAMED_GROUP_START = "(?<"
+    private const val TWO_DIGIT_YEAR_BASE = 2000
+    private const val FULL_YEAR_DIGITS = 4
+    private const val HOURS_PER_HALF_DAY = 12
+    private const val MIN_MONTH_NAME_LENGTH = 3
+    private val MONTHS = 1..12
 
     private val incomeKeywords = listOf("credited", "received", "deposited", "added")
     private val expenseKeywords = listOf("debited", "sent", "withdrawn", "spent", "paid", "purchased")
@@ -108,56 +180,73 @@ object SmsParser {
         accountName: String,
         receivedAtMillis: Long,
     ): SmsParseResult {
-        val masterRegex = rules.masterRegex ?: Constants.DEFAULT_SMS_REGEX
-        val master = runStep(masterRegex, body, allMatches = false)
-        val masterAmountText = master.firstGroup
-
-        if (!rules.useMultiRegex) {
-            val amount = masterAmountText.toAmount()
-            val type = detectTypeByKeywords(body)
-            return SmsParseResult(
-                useMultiRegex = false,
-                master = master,
-                amountText = masterAmountText,
-                amountSource = SmsAmountSource.MASTER_REGEX,
-                amount = amount,
-                type = type,
-                typeSource = SmsTypeSource.KEYWORDS,
-                parsedDateTimeMillis = null,
-                balance = null,
-                description = null,
-                transaction = null,
-                failure = null,
-            ).withOutcome(body, accountName, receivedAtMillis)
-        }
+        val multi = rules.useMultiRegex
+        val master = runStep(
+            regex = rules.masterRegex ?: Constants.DEFAULT_SMS_REGEX,
+            body = body,
+            allMatches = false,
+            reads = SmsGroup.entries.toSet(),
+        )
 
         // A blank field means "not set". Running an empty pattern would match every SMS,
         // which turned every message into income when the income field was left empty.
-        val amountStep = runStep(rules.amountRegex.orNullIfBlank(), body, allMatches = false)
-        val balanceStep = runStep(rules.balanceRegex.orNullIfBlank(), body, allMatches = false)
-        val incomeStep = runStep(rules.incomeRegex.orNullIfBlank(), body, allMatches = false)
-        val expenseStep = runStep(rules.expenseRegex.orNullIfBlank(), body, allMatches = false)
-        val dateTimeStep = runStep(rules.dateTimeRegex.orNullIfBlank(), body, allMatches = false)
-        val descriptionStep = runStep(rules.descriptionRegex.orNullIfBlank(), body, allMatches = true)
+        fun fieldStep(regex: String?, reads: Set<SmsGroup>, allMatches: Boolean = false): SmsRegexStep? =
+            if (multi) runStep(regex.orNullIfBlank(), body, allMatches, reads) else null
 
-        val regexAmount = amountStep.firstGroup.toAmount()
-        val (amountText, amountSource, amount) = if (regexAmount != null) {
-            Triple(amountStep.firstGroup, SmsAmountSource.AMOUNT_REGEX, regexAmount)
-        } else {
-            Triple(masterAmountText, SmsAmountSource.MASTER_REGEX, masterAmountText.toAmount())
+        val amountStep = fieldStep(rules.amountRegex, setOf(SmsGroup.AMOUNT))
+        val balanceStep = fieldStep(rules.balanceRegex, setOf(SmsGroup.BALANCE))
+        val incomeStep = fieldStep(rules.incomeRegex, emptySet())
+        val expenseStep = fieldStep(rules.expenseRegex, emptySet())
+        val dateTimeStep = fieldStep(rules.dateTimeRegex, SmsGroup.DATE_TIME)
+        val descriptionStep = fieldStep(rules.descriptionRegex, setOf(SmsGroup.DESCRIPTION), allMatches = true)
+
+        // Each value comes from its own pattern, then from the master pattern. Without named
+        // groups, master group 1 is the amount and the master gives nothing else.
+        val fieldAmountText = amountStep?.namedOrFirst(SmsGroup.AMOUNT)
+        val masterAmountText = master.namedOrFirst(SmsGroup.AMOUNT)
+        val fieldAmount = fieldAmountText.toAmount()
+        val masterAmount = masterAmountText.toAmount()
+        val (amountText, amountSource, amount) = when {
+            fieldAmount != null -> Triple(fieldAmountText, SmsValueSource.FIELD_REGEX, fieldAmount)
+            masterAmount != null -> Triple(masterAmountText, SmsValueSource.MASTER_REGEX, masterAmount)
+            else -> Triple(masterAmountText ?: fieldAmountText, null, null)
         }
 
+        val masterType = when {
+            master.named(SmsGroup.INCOME).isNotEmpty() -> TransactionType.INCOME
+            master.named(SmsGroup.EXPENSE).isNotEmpty() -> TransactionType.EXPENSE
+            else -> null
+        }
         val (type, typeSource) = when {
-            incomeStep.matched -> TransactionType.INCOME to SmsTypeSource.INCOME_REGEX
-            expenseStep.matched -> TransactionType.EXPENSE to SmsTypeSource.EXPENSE_REGEX
+            incomeStep?.matched == true -> TransactionType.INCOME to SmsTypeSource.INCOME_REGEX
+            expenseStep?.matched == true -> TransactionType.EXPENSE to SmsTypeSource.EXPENSE_REGEX
+            masterType != null -> masterType to SmsTypeSource.MASTER_REGEX
             else -> detectTypeByKeywords(body) to SmsTypeSource.KEYWORDS
         }
 
-        // Description joins every group of every match.
-        val descriptionGroups = descriptionStep.matches.flatMap { it.groups.filterNotNull() }
+        val fieldDate = dateTimeStep?.let { readDateTime(it, receivedAtMillis, positional = true) }
+        val masterDate = readDateTime(master, receivedAtMillis, positional = false)
+        val (dateTimeMillis, dateTimeSource) = pick(fieldDate?.millis, masterDate?.millis)
+        val dateTimeProblem = fieldDate?.problem ?: masterDate?.problem?.takeIf { dateTimeMillis == null }
+
+        // Description joins every group of every match, or only the description groups if there are names.
+        val fieldDescription = descriptionStep?.let { step ->
+            step.matches.flatMap { match ->
+                if (step.usesNames) step.named(SmsGroup.DESCRIPTION, match) else match.groups.filterNotNull()
+            }
+        }
+        val (descriptionLines, descriptionSource) = pick(
+            fieldDescription?.takeIf { it.isNotEmpty() },
+            master.named(SmsGroup.DESCRIPTION).takeIf { it.isNotEmpty() },
+        )
+
+        val (balance, balanceSource) = pick(
+            balanceStep?.namedOrFirst(SmsGroup.BALANCE),
+            master.named(SmsGroup.BALANCE).firstOrNull(),
+        )
 
         return SmsParseResult(
-            useMultiRegex = true,
+            useMultiRegex = multi,
             master = master,
             amountStep = amountStep,
             balanceStep = balanceStep,
@@ -170,14 +259,22 @@ object SmsParser {
             amount = amount,
             type = type,
             typeSource = typeSource,
-            parsedDateTimeMillis = dateTimeStep.matches.firstOrNull()?.let {
-                parseDateTimeGroups(it.groups, receivedAtMillis)
-            },
-            balance = balanceStep.firstGroup,
-            description = descriptionGroups.takeIf { it.isNotEmpty() }?.joinToString("\n"),
+            parsedDateTimeMillis = dateTimeMillis,
+            dateTimeSource = dateTimeSource,
+            dateTimeProblem = dateTimeProblem,
+            balance = balance,
+            balanceSource = balanceSource,
+            description = descriptionLines?.joinToString("\n"),
+            descriptionSource = descriptionSource,
             transaction = null,
             failure = null,
         ).withOutcome(body, accountName, receivedAtMillis)
+    }
+
+    private fun <T : Any> pick(fromField: T?, fromMaster: T?): Pair<T?, SmsValueSource?> = when {
+        fromField != null -> fromField to SmsValueSource.FIELD_REGEX
+        fromMaster != null -> fromMaster to SmsValueSource.MASTER_REGEX
+        else -> null to null
     }
 
     private fun SmsParseResult.withOutcome(
@@ -220,7 +317,7 @@ object SmsParser {
         )
     }
 
-    private fun runStep(regex: String?, body: String, allMatches: Boolean): SmsRegexStep {
+    private fun runStep(regex: String?, body: String, allMatches: Boolean, reads: Set<SmsGroup>): SmsRegexStep {
         if (regex == null) return SmsRegexStep(regex = null)
         val pattern = try {
             Pattern.compile(regex, FLAGS)
@@ -229,6 +326,15 @@ object SmsParser {
         }
 
         val matcher = pattern.matcher(body)
+        val scannedNames = scanGroupNames(regex)
+        val namesReadable = scannedNames.size == matcher.groupCount()
+        val groupNames = if (namesReadable && scannedNames.any { it != null }) scannedNames else emptyList()
+        val warnings = when {
+            !namesReadable && scannedNames.any { it != null } ->
+                listOf("Couldn't read the group names in this pattern, so groups are read by position.")
+            else -> nameWarnings(groupNames, reads)
+        }
+
         val matches = mutableListOf<SmsRegexMatch>()
         while (matcher.find()) {
             matches += SmsRegexMatch(
@@ -238,52 +344,168 @@ object SmsParser {
             )
             if (!allMatches) break
         }
-        return SmsRegexStep(regex = regex, matches = matches)
+        return SmsRegexStep(regex = regex, matches = matches, groupNames = groupNames, warnings = warnings)
     }
+
+    private fun nameWarnings(groupNames: List<String?>, reads: Set<SmsGroup>): List<String> =
+        groupNames.filterNotNull().distinct().mapNotNull { name ->
+            val group = SmsGroup.of(name)
+            when {
+                group == null -> "<$name> isn't a name the parser reads, so it's ignored."
+                group in reads -> null
+                group.fieldLabel == null -> "<$name> is ignored here. Only the master pattern reads it."
+                else -> "<$name> is ignored here. It's read from the ${group.fieldLabel} or master pattern."
+            }
+        }
+
+    /**
+     * Name of each capturing group in [regex], in group order, null for an unnamed group.
+     * Android's regex API can't list group names, so they're read from the pattern text.
+     * The caller checks the count against the compiled pattern's group count.
+     */
+    internal fun scanGroupNames(regex: String): List<String?> {
+        val names = mutableListOf<String?>()
+        var classDepth = 0
+        var i = 0
+        while (i < regex.length) {
+            val c = regex[i]
+            when {
+                c == '\\' && regex.getOrNull(i + 1) == 'Q' -> {
+                    // \Q...\E quotes everything in between
+                    val end = regex.indexOf("\\E", startIndex = i + 2)
+                    i = if (end == -1) regex.length else end + 1
+                }
+                c == '\\' -> i++
+                classDepth > 0 -> when (c) {
+                    '[' -> classDepth++
+                    ']' -> classDepth--
+                }
+                c == '[' -> {
+                    classDepth = 1
+                    // A ] right after [ or [^ is a literal
+                    if (regex.getOrNull(i + 1) == '^') i++
+                    if (regex.getOrNull(i + 1) == ']') i++
+                }
+                c == '(' && regex.getOrNull(i + 1) != '?' -> names += null
+                regex.startsWith(NAMED_GROUP_START, i) &&
+                    regex.getOrNull(i + NAMED_GROUP_START.length).isAsciiLetter() -> {
+                    val nameStart = i + NAMED_GROUP_START.length
+                    val end = regex.indexOf('>', startIndex = nameStart)
+                    if (end != -1) names += regex.substring(nameStart, end)
+                }
+            }
+            i++
+        }
+        return names
+    }
+
+    private fun Char?.isAsciiLetter(): Boolean = this != null && (this in 'a'..'z' || this in 'A'..'Z')
 
     private fun String?.orNullIfBlank(): String? = this?.takeIf { it.isNotBlank() }
 
     private fun String?.toAmount(): Double? = this?.replace(",", "")?.toDoubleOrNull()
 
-    /** Groups are (day)(month)(year), optionally followed by (hour)(minute)(second). */
-    fun parseDateTimeGroups(groups: List<String?>, receivedAtMillis: Long): Long? {
-        if (groups.size < 3) return null
+    /** Like [SmsRegexStep.named], but a pattern without named groups gives its group 1. */
+    private fun SmsRegexStep.namedOrFirst(group: SmsGroup): String? =
+        if (usesNames) named(group).firstOrNull() else firstGroup
 
+    private class DateTimeRead(val millis: Long? = null, val problem: String? = null)
+
+    /**
+     * Reads the date from the step's first match, or returns null when there's nothing to read.
+     * With [positional], a pattern without named groups is read as (day)(month)(year)(hour)(minute)(second).
+     */
+    private fun readDateTime(step: SmsRegexStep, receivedAtMillis: Long, positional: Boolean): DateTimeRead? {
+        val match = step.matches.firstOrNull()
+        val named = step.hasGroupFor(SmsGroup.DATE_TIME) || (step.usesNames && positional)
+        val values = when {
+            match == null || (!named && !positional) -> null
+            named -> SmsGroup.DATE_TIME.associateWith { step.named(it, match).firstOrNull() }
+            else -> SmsGroup.POSITIONAL_DATE_TIME.zip(match.groups).toMap()
+        } ?: return null
         return try {
-            val calendar = Calendar.getInstance().apply { timeInMillis = receivedAtMillis }
-            val day = groups[0]?.toIntOrNull() ?: return null
-            val monthStr = groups[1] ?: return null
-            val year = groups[2]?.let {
-                if (it.length == 2) 2000 + it.toInt() else it.toIntOrNull()
-            } ?: calendar.get(Calendar.YEAR)
-
-            val month = monthStr.toIntOrNull()?.minus(1) ?: parseMonthName(monthStr) ?: return null
-
-            calendar.set(Calendar.YEAR, year)
-            calendar.set(Calendar.MONTH, month)
-            calendar.set(Calendar.DAY_OF_MONTH, day)
-
-            if (groups.size >= 6) {
-                calendar.set(Calendar.HOUR_OF_DAY, groups[3]?.toIntOrNull() ?: 0)
-                calendar.set(Calendar.MINUTE, groups[4]?.toIntOrNull() ?: 0)
-                calendar.set(Calendar.SECOND, groups[5]?.toIntOrNull() ?: 0)
-            } else {
-                calendar.set(Calendar.HOUR_OF_DAY, 0)
-                calendar.set(Calendar.MINUTE, 0)
-                calendar.set(Calendar.SECOND, 0)
-            }
-            calendar.set(Calendar.MILLISECOND, 0)
-
-            calendar.timeInMillis
-        } catch (_: Exception) {
-            null
+            DateTimeRead(millis = buildDateTime(values, receivedAtMillis))
+        } catch (e: DateTimeException) {
+            DateTimeRead(problem = e.message)
         }
     }
 
+    /**
+     * Builds a date from day, month and year, optionally with hour, minute, second and AM/PM.
+     * A missing year is the year the SMS arrived, and a missing time is midnight.
+     *
+     * @throws DateTimeException saying what's wrong when the values don't make a date
+     */
+    fun buildDateTime(
+        values: Map<SmsGroup, String?>,
+        receivedAtMillis: Long,
+        zone: ZoneId = ZoneId.systemDefault(),
+    ): Long {
+        fun text(group: SmsGroup) = values[group]?.trim()
+
+        val dayText = text(SmsGroup.DAY)
+        val monthText = text(SmsGroup.MONTH)
+        if (dayText == null || monthText == null) {
+            throw DateTimeException("Needs a day and a month, but no day or month group took part in the match.")
+        }
+        val day = number(dayText, "Day")
+        val month = readMonth(monthText, day)
+        val year = text(SmsGroup.YEAR)?.let { readYear(it) } ?: Instant.ofEpochMilli(receivedAtMillis).atZone(zone).year
+        if (!YearMonth.of(year, month).isValidDay(day)) {
+            val monthName = Month.of(month).getDisplayName(TextStyle.FULL, Locale.ENGLISH)
+            throw DateTimeException("Day $day doesn't exist in $monthName $year.")
+        }
+
+        return LocalDateTime.of(
+            year,
+            month,
+            day,
+            to24Hour(text(SmsGroup.HOUR)?.let { number(it, "Hour") } ?: 0, text(SmsGroup.AMPM)),
+            text(SmsGroup.MINUTE)?.let { number(it, "Minute") } ?: 0,
+            text(SmsGroup.SECOND)?.let { number(it, "Second") } ?: 0,
+        ).atZone(zone).toInstant().toEpochMilli()
+    }
+
+    private fun number(text: String, label: String): Int =
+        text.toIntOrNull() ?: throw DateTimeException("$label \"$text\" isn't a number.")
+
+    private fun readMonth(text: String, day: Int): Int {
+        val month = text.toIntOrNull() ?: parseMonthName(text)
+            ?: throw DateTimeException("Month \"$text\" isn't a number or an English month name.")
+        if (month !in MONTHS) {
+            val swapped = if (day in MONTHS) " Are the day and month the wrong way round?" else ""
+            throw DateTimeException("Month $month doesn't exist.$swapped")
+        }
+        return month
+    }
+
+    private fun readYear(text: String): Int {
+        val year = number(text, "Year")
+        return when (text.length) {
+            2 -> TWO_DIGIT_YEAR_BASE + year
+            FULL_YEAR_DIGITS -> year
+            else -> throw DateTimeException("Year \"$text\" should have 2 or 4 digits.")
+        }
+    }
+
+    /** Turns a 12-hour clock [hour] into 0 to 23 when there's an AM/PM marker. */
+    private fun to24Hour(hour: Int, ampm: String?): Int {
+        val marker = ampm?.lowercase()?.firstOrNull() ?: return hour
+        if (hour !in 1..HOURS_PER_HALF_DAY) {
+            throw DateTimeException("Hour $hour isn't 1 to 12, as an AM/PM time needs.")
+        }
+        return when (marker) {
+            'a' -> hour % HOURS_PER_HALF_DAY
+            'p' -> hour % HOURS_PER_HALF_DAY + HOURS_PER_HALF_DAY
+            else -> throw DateTimeException("\"$ampm\" isn't AM or PM.")
+        }
+    }
+
+    /** "Jan", "Sept" or "January". */
     private fun parseMonthName(monthName: String): Int? {
-        val months = DateFormatSymbols.getInstance(Locale.ENGLISH).shortMonths
-        val index = months.indexOfFirst { it.equals(monthName, ignoreCase = true) }
-        return if (index != -1) index else null
+        val name = monthName.trimEnd('.').lowercase()
+        if (name.length < MIN_MONTH_NAME_LENGTH) return null
+        return Month.entries.firstOrNull { it.name.lowercase().startsWith(name) }?.value
     }
 
     fun detectTypeByKeywords(body: String): TransactionType = when {

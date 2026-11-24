@@ -47,19 +47,21 @@ Ivy Wallet Plus can read your bank's SMS alerts and record the transactions for 
 2. Tap **SAMPLE SMS**, next to **Auto Listen to SMS**, and pick an SMS from your bank. Its sender and the SIM it came in on are filled in for you. You can also set them yourself, as in the next two steps.
 3. Enter the bank's sender name or number, or tap **PICK** to choose a contact. An SMS counts when its sender, or the sender's contact name, contains this text.
 4. Optionally, choose a **SIM** so only messages that arrive on it count. The list shows each SIM as `carrier (ID): phone number · SIM name`. The name is the one you gave the SIM in Android's settings, if any. The number only appears when Android knows it, and it's then checked as well. To type the receiving phone number yourself, choose **Manual Entry**.
-5. Enter an **SMS Parsing Regex**. A message must match it, and its first capture group is read as the amount. If you leave it empty, a generic pattern is used, but you'll usually need one that fits your bank's wording.
+5. Enter an **SMS Parsing Regex**. A message must match it, and its first capture group, or a group named `amount`, is read as the amount. If you leave it empty, a generic pattern is used, but you'll usually need one that fits your bank's wording.
 6. Optionally, turn on **Use Advanced Multi-Regex** to use separate patterns, described below. **IMPORT CONFIG** loads all the patterns from a JSON file with any of these keys: `masterMatch`, `useMultiRegex`, `incomeRegex`, `expenseRegex`, `amountRegex`, `dateTimeRegex`, `descriptionRegex` and `balanceRegex`.
 7. **Capture Location** is on by default. Turn it off if you don't want SMS transactions to record where your phone was. See [Locations](#locations).
 
 | Pattern | What it does |
 |---|---|
 | Income / Expense Identification | If either matches anywhere in the message, it sets the transaction type. |
-| Amount Extraction | The first capture group is the amount. Commas are stripped. |
-| Date/Time Extraction | Capture groups are day, month (a number or an English short name like `Jan`) and year (2 or 4 digits), optionally followed by hour, minute and second. |
-| Description Extraction | Every capture group from every match, one per line. |
-| Balance Extraction | The first capture group is added to the description as `(Bal: …)`, and checked against the account's balance. See [Out-of-sync warnings](#out-of-sync-warnings). |
+| Amount Extraction | The `amount` group is the amount. Commas are stripped. |
+| Date/Time Extraction | Groups named `day`, `month` (a number or an English name like `Jan`), `year` (2 or 4 digits), `hour`, `minute`, `second` and `ampm`, in any order. Only day and month are required. |
+| Description Extraction | Every `description` group from every match, one per line. |
+| Balance Extraction | The `balance` group is added to the description as `(Bal: …)`, and checked against the account's balance. See [Out-of-sync warnings](#out-of-sync-warnings). |
 
-Without a type match, or without multi-regex, words like "credited", "received", "deposited" or "added" make the transaction income, and anything else makes it an expense. Without a date match, the transaction is dated when the SMS arrives. An empty pattern field is ignored.
+**Named groups** like `(?<day>\d{2})` let the values come in any order, so one pattern can read dates written as `20/11/2026` in one SMS and `2026-11-21` in the next. The master pattern can name values too. They're used when a value's own pattern is empty or finds nothing, and in single-regex mode. Patterns without named groups still work by position: group 1 is the amount or balance, the date groups are day, month, year, hour, minute and second, and the description takes every group. [Writing SMS patterns](docs/SMS-Patterns.md) lists every name, with examples and tips for sharing a config.
+
+Without a type match, words like "credited", "received", "deposited" or "added" make the transaction income, and anything else makes it an expense. Without a date match, the transaction is dated when the SMS arrives. An empty pattern field is ignored.
 
 Every pattern runs case-insensitive, with `DOTALL` (`.` also matches new lines) and `MULTILINE` (`^` and `$` match at each line). A long SMS that arrives in several parts is read as one message.
 
@@ -84,7 +86,7 @@ New lines, no-break spaces and other invisible characters show as orange markers
 
 ### Out-of-sync warnings
 
-With multi-regex and a Balance Extraction pattern, every SMS transaction is followed by a balance check. If the balance in the SMS differs from the account's balance in the app by a cent or more, an "Out of sync" notification shows both balances. Usually a transaction is missing, doubled or has the wrong amount. From the notification, you can:
+When a pattern reads the balance from the SMS, every SMS transaction is followed by a balance check. If the balance in the SMS differs from the account's balance in the app by a cent or more, an "Out of sync" notification shows both balances. Usually a transaction is missing, doubled or has the wrong amount. From the notification, you can:
 
 - **Tap it** to open Add transaction with the account, the Rebalance category (created the first time) and the difference already filled in, as income if the app shows too little or an expense if it shows too much. The difference is worked out again when you tap, so it accounts for changes you made in the meantime, like correcting the SMS transaction. If nothing is left to fix, a message says so.
 - **Fix manually** to open the account's transactions and find the problem yourself.

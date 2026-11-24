@@ -51,12 +51,13 @@ import androidx.core.content.ContextCompat
 import com.ivy.design.l0_system.UI
 import com.ivy.design.l0_system.style
 import com.ivy.legacy.sms.ParsedSmsTransaction
-import com.ivy.legacy.sms.SmsAmountSource
+import com.ivy.legacy.sms.SmsGroup
 import com.ivy.legacy.sms.SmsParseResult
 import com.ivy.legacy.sms.SmsParser
 import com.ivy.legacy.sms.SmsParsingRules
 import com.ivy.legacy.sms.SmsRegexStep
 import com.ivy.legacy.sms.SmsTypeSource
+import com.ivy.legacy.sms.SmsValueSource
 import com.ivy.legacy.sms.lookupContactName
 import com.ivy.ui.R
 import com.ivy.wallet.ui.theme.components.CircleButton
@@ -523,11 +524,7 @@ private fun LazyListScope.multiRegexSteps(result: SmsParseResult) {
             step = result.balanceStep,
             needsGroups = true,
             groupLabels = listOf("balance"),
-            outcome = when {
-                result.balance != null -> "Appended to the description as \"(Bal: ${result.balance})\"." to UI.colors.green
-                result.balanceStep?.isSet != true -> "Not set." to UI.colors.gray
-                else -> "No balance captured." to UI.colors.orange
-            }
+            outcome = balanceOutcome(result)
         )
     }
 }
@@ -536,43 +533,86 @@ private fun LazyListScope.multiRegexSteps(result: SmsParseResult) {
 private fun amountOutcome(result: SmsParseResult): Pair<String, Color> {
     val amount = result.amount
     val step = result.amountStep
+    val masterAmount = masterGroupLabel(result, SmsGroup.AMOUNT)
     return when {
-        result.amountSource == SmsAmountSource.AMOUNT_REGEX && amount != null ->
+        result.amountSource == SmsValueSource.FIELD_REGEX && amount != null ->
             "Amount ${amount.plain()} (read from \"${result.amountText}\")." to UI.colors.green
         amount != null -> {
             val why = if (step?.isSet == true) "This regex gave no number" else "Not set"
-            "$why, so master group 1 is used: ${amount.plain()} (from \"${result.amountText}\")." to UI.colors.orange
+            "$why, so $masterAmount is used: ${amount.plain()} (from \"${result.amountText}\")." to
+                UI.colors.orange
         }
         result.amountText != null ->
             "\"${result.amountText}\" isn't a number after removing commas. No transaction." to UI.colors.red
-        else -> "No amount here or in master group 1. No transaction." to UI.colors.red
+        else -> "No amount here or in $masterAmount. No transaction." to UI.colors.red
     }
 }
+
+/** How the master pattern gives [group]: "master group 1" for the amount without names, else the named group. */
+private fun masterGroupLabel(result: SmsParseResult, group: SmsGroup): String =
+    if (group == SmsGroup.AMOUNT && !result.master.usesNames) {
+        "master group 1"
+    } else {
+        "the master's <${group.key}> group"
+    }
+
+/** Says the master gave [value] instead, for a step whose own pattern gave nothing. */
+@Composable
+private fun fromMaster(reason: String, value: String): Pair<String, Color> =
+    "$reason, so the master pattern's named groups are used: $value" to UI.colors.orange
 
 @Composable
 private fun dateOutcome(result: SmsParseResult): Pair<String, Color> {
     val step = result.dateTimeStep
     val parsed = result.parsedDateTimeMillis
-    val firstMatch = step?.matches?.firstOrNull()
+    val ownReason = when {
+        step == null || !step.isSet -> "Not set"
+        !step.matched -> "No match"
+        else -> result.dateTimeProblem ?: "Couldn't build a date from these groups."
+    }
     return when {
-        parsed != null -> "Date: ${parsed.formatWith(fullDateFormatter)}" to UI.colors.green
+        parsed != null && result.dateTimeSource == SmsValueSource.FIELD_REGEX ->
+            "Date: ${parsed.formatWith(fullDateFormatter)}" to UI.colors.green
+        parsed != null -> fromMaster(ownReason.removeSuffix("."), parsed.formatWith(fullDateFormatter))
         step == null || !step.isSet -> "Not set: the SMS receive time is used." to UI.colors.gray
-        firstMatch == null -> "No match: the SMS receive time is used." to UI.colors.orange
-        firstMatch.groups.size < 3 ->
-            "Needs at least 3 groups: (day)(month)(year). Receive time is used." to UI.colors.red
-        else -> "Couldn't build a date from these groups. Receive time is used." to UI.colors.red
+        !step.matched -> "No match: the SMS receive time is used." to UI.colors.orange
+        else -> "$ownReason The SMS receive time is used." to UI.colors.red
     }
 }
 
 @Composable
 private fun descriptionOutcome(result: SmsParseResult): Pair<String, Color> {
     val step = result.descriptionStep
+    val ownReason = when {
+        step == null || !step.isSet -> "Not set"
+        step.matched -> "No group here captured any text"
+        else -> "No match"
+    }
     return when {
+        result.descriptionSource == SmsValueSource.MASTER_REGEX ->
+            fromMaster(ownReason, "see the result below.")
         step == null || !step.isSet -> "Not set: no description." to UI.colors.gray
+        result.description != null && step.usesNames ->
+            "Every <description> group of every match, joined with new lines (see the result below)." to
+                UI.colors.green
         result.description != null ->
             "Every group of every match, joined with new lines (see the result below)." to UI.colors.green
         step.matched -> "Matched, but no group captured any text." to UI.colors.red
         else -> "No match: no description." to UI.colors.red
+    }
+}
+
+@Composable
+private fun balanceOutcome(result: SmsParseResult): Pair<String, Color> {
+    val step = result.balanceStep
+    val appended = "appended to the description as \"(Bal: ${result.balance})\"."
+    return when {
+        result.balanceSource == SmsValueSource.FIELD_REGEX -> appended.replaceFirstChar { it.uppercase() } to
+            UI.colors.green
+        result.balanceSource == SmsValueSource.MASTER_REGEX ->
+            fromMaster(if (step?.isSet == true) "No balance captured here" else "Not set", appended)
+        step?.isSet != true -> "Not set." to UI.colors.gray
+        else -> "No balance captured." to UI.colors.orange
     }
 }
 
@@ -677,7 +717,7 @@ private fun ModeCard(result: SmsParseResult) {
                 append("Every pattern runs with ${SmsParser.FLAGS_LABEL}. ")
                 append("DOTALL lets . match new lines, and MULTILINE makes ^ and $ match at each line.")
                 if (!result.useMultiRegex) {
-                    append(" Only this regex is used; the type comes from keywords.")
+                    append(" Only this regex is used.")
                 }
             },
             style = UI.typo.c.style(color = UI.colors.gray, fontWeight = FontWeight.Medium)
@@ -725,6 +765,11 @@ private fun StepCard(
             Text(text = "Regex error: $it", style = UI.typo.c.style(color = UI.colors.red))
         }
 
+        step?.warnings?.forEach {
+            Spacer(Modifier.height(4.dp))
+            Text(text = it, style = UI.typo.c.style(color = UI.colors.orange, fontWeight = FontWeight.SemiBold))
+        }
+
         val matches = step?.matches.orEmpty()
         val shown = if (showAllMatches) matches else matches.take(1)
         shown.forEachIndexed { index, match ->
@@ -739,12 +784,17 @@ private fun StepCard(
             Text(text = visibleText(match.value), style = monoStyle())
             if (match.groups.isEmpty() && needsGroups) {
                 Text(
-                    text = "No capturing groups. Wrap the part you want in ( ).",
+                    text = "No capturing groups. Wrap the part you want in ( ), or name it like (?<amount>…).",
                     style = UI.typo.c.style(color = UI.colors.red)
                 )
             }
             match.groups.forEachIndexed { groupIndex, group ->
-                val label = groupLabels.getOrNull(groupIndex)?.let { " ($it)" }.orEmpty()
+                val name = if (step?.usesNames == true) {
+                    step.groupNames.getOrNull(groupIndex)
+                } else {
+                    groupLabels.getOrNull(groupIndex)
+                }
+                val label = name?.let { " ($it)" }.orEmpty()
                 Spacer(Modifier.height(4.dp))
                 FieldLabel("Group ${groupIndex + 1}$label")
                 if (group == null) {
@@ -790,6 +840,8 @@ private fun TypeSummary(result: SmsParseResult) {
             text = when (result.typeSource) {
                 SmsTypeSource.INCOME_REGEX -> "From the income regex."
                 SmsTypeSource.EXPENSE_REGEX -> "From the expense regex."
+                SmsTypeSource.MASTER_REGEX -> "Neither regex matched, so the master's " +
+                    "<${result.type.name.lowercase()}> group decided."
                 SmsTypeSource.KEYWORDS -> "Neither regex matched, so keywords decided " +
                     "(credited/received/deposited/added → income, otherwise expense)."
             },
@@ -800,23 +852,42 @@ private fun TypeSummary(result: SmsParseResult) {
 
 @Composable
 private fun SingleRegexSummary(result: SmsParseResult) {
+    val named = result.master.usesNames
+    val amountGroup = if (named) "<amount>" else "Group 1"
     InfoCard {
-        CardTitle("Amount and type")
+        CardTitle(if (named) "Values from named groups" else "Amount and type")
         Spacer(Modifier.height(4.dp))
         val amount = result.amount
         Text(
             text = when {
-                amount != null -> "Amount ${amount.plain()} from group 1 (\"${result.amountText}\")."
-                result.amountText != null -> "Group 1 \"${result.amountText}\" isn't a number."
-                else -> "Group 1 captured nothing."
+                amount != null ->
+                    "Amount ${amount.plain()} from ${amountGroup.lowercase()} (\"${result.amountText}\")."
+                result.amountText != null -> "$amountGroup \"${result.amountText}\" isn't a number."
+                else -> "$amountGroup captured nothing."
             },
             style = UI.typo.c.style(
                 color = if (amount != null) UI.colors.green else UI.colors.red,
                 fontWeight = FontWeight.SemiBold
             )
         )
+        val typeFrom = if (result.typeSource == SmsTypeSource.MASTER_REGEX) {
+            "the <${result.type.name.lowercase()}> group"
+        } else {
+            "keywords"
+        }
         Text(
-            text = "Type ${result.type}, from keywords. Description and date aren't parsed in this mode.",
+            text = if (named) {
+                "Type ${result.type}, from $typeFrom. " + listOf(
+                    "date" to (result.parsedDateTimeMillis?.formatWith(fullDateFormatter) ?: result.dateTimeProblem),
+                    "description" to result.description,
+                    "balance" to result.balance,
+                ).joinToString(" ") { (field, value) ->
+                    if (value == null) "No $field." else "${field.replaceFirstChar { it.uppercase() }}: $value."
+                }
+            } else {
+                "Type ${result.type}, from keywords. Name groups, like (?<day>…), to also read the date, " +
+                    "description or balance."
+            },
             style = UI.typo.c.style(color = UI.colors.gray, fontWeight = FontWeight.Medium)
         )
     }
