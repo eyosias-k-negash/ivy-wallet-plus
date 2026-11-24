@@ -5,6 +5,7 @@ import android.net.Uri
 import android.provider.ContactsContract
 import com.ivy.base.model.TransactionType
 import com.ivy.legacy.Constants
+import java.math.BigDecimal
 import java.security.MessageDigest
 import java.text.DateFormatSymbols
 import java.util.Calendar
@@ -22,6 +23,12 @@ data class SmsParsingRules(
     val dateTimeRegex: String? = null,
     val descriptionRegex: String? = null,
     val balanceRegex: String? = null,
+    val feeRegex: String? = null,
+    // The account's Capture menu. A field that's off isn't used, even when its regex matches.
+    val captureDate: Boolean = true,
+    val captureDescription: Boolean = true,
+    val captureBalance: Boolean = true,
+    val captureFee: Boolean = false,
 )
 
 data class SmsRegexMatch(
@@ -55,6 +62,8 @@ data class ParsedSmsTransaction(
     val description: String?,
     /** The account balance the SMS reports after this transaction, if the balance regex found one. */
     val balance: Double?,
+    /** A fee the fee regex found, saved as its own expense. Null when there's none or fee capture is off. */
+    val fee: Double? = null,
 )
 
 /**
@@ -62,6 +71,7 @@ data class ParsedSmsTransaction(
  * why a message did or didn't become a transaction.
  */
 data class SmsParseResult(
+    val rules: SmsParsingRules,
     val useMultiRegex: Boolean,
     val master: SmsRegexStep,
     // The steps below only run in multi-regex mode.
@@ -71,17 +81,21 @@ data class SmsParseResult(
     val expenseStep: SmsRegexStep? = null,
     val dateTimeStep: SmsRegexStep? = null,
     val descriptionStep: SmsRegexStep? = null,
+    val feeStep: SmsRegexStep? = null,
 
     val amountText: String?,
     val amountSource: SmsAmountSource,
     val amount: Double?,
     val type: TransactionType,
     val typeSource: SmsTypeSource,
-    /** Date read from the SMS text. Null means the receive time is used. */
+    // What the regexes found. The transaction only uses what the Capture menu turns on.
+    /** Date read from the SMS text. */
     val parsedDateTimeMillis: Long?,
     val balance: String?,
     /** Description from the description regex, before the balance is appended. */
     val description: String?,
+    /** Every group of every fee match, added up. Null when there's no match or a group isn't a number. */
+    val fee: Double? = null,
 
     /** The transaction the receiver would save, or null when [failure] says why not. */
     val transaction: ParsedSmsTransaction?,
@@ -116,6 +130,7 @@ object SmsParser {
             val amount = masterAmountText.toAmount()
             val type = detectTypeByKeywords(body)
             return SmsParseResult(
+                rules = rules,
                 useMultiRegex = false,
                 master = master,
                 amountText = masterAmountText,
@@ -139,6 +154,7 @@ object SmsParser {
         val expenseStep = runStep(rules.expenseRegex.orNullIfBlank(), body, allMatches = false)
         val dateTimeStep = runStep(rules.dateTimeRegex.orNullIfBlank(), body, allMatches = false)
         val descriptionStep = runStep(rules.descriptionRegex.orNullIfBlank(), body, allMatches = true)
+        val feeStep = runStep(rules.feeRegex.orNullIfBlank(), body, allMatches = true)
 
         val regexAmount = amountStep.firstGroup.toAmount()
         val (amountText, amountSource, amount) = if (regexAmount != null) {
@@ -155,8 +171,12 @@ object SmsParser {
 
         // Description joins every group of every match.
         val descriptionGroups = descriptionStep.matches.flatMap { it.groups.filterNotNull() }
+        // Fee adds them up, so a service charge and its VAT become one fee.
+        val feeGroups = feeStep.matches.flatMap { it.groups.filterNotNull() }
+        val feeParts = feeGroups.map { it.toBigDecimalAmount() }
 
         return SmsParseResult(
+            rules = rules,
             useMultiRegex = true,
             master = master,
             amountStep = amountStep,
@@ -165,6 +185,7 @@ object SmsParser {
             expenseStep = expenseStep,
             dateTimeStep = dateTimeStep,
             descriptionStep = descriptionStep,
+            feeStep = feeStep,
             amountText = amountText,
             amountSource = amountSource,
             amount = amount,
@@ -175,6 +196,10 @@ object SmsParser {
             },
             balance = balanceStep.firstGroup,
             description = descriptionGroups.takeIf { it.isNotEmpty() }?.joinToString("\n"),
+            fee = feeParts.takeIf { it.isNotEmpty() && null !in it }
+                ?.filterNotNull()
+                ?.fold(BigDecimal.ZERO, BigDecimal::add)
+                ?.toDouble(),
             transaction = null,
             failure = null,
         ).withOutcome(body, accountName, receivedAtMillis)
@@ -185,14 +210,16 @@ object SmsParser {
         accountName: String,
         receivedAtMillis: Long,
     ): SmsParseResult {
+        // A broken regex for a field the Capture menu turned off doesn't stop the transaction.
         val invalidStep = listOfNotNull(
             "Master" to master,
             amountStep?.let { "Amount" to it },
-            balanceStep?.let { "Balance" to it },
+            balanceStep?.takeIf { rules.captureBalance }?.let { "Balance" to it },
             incomeStep?.let { "Income" to it },
             expenseStep?.let { "Expense" to it },
-            dateTimeStep?.let { "Date/time" to it },
-            descriptionStep?.let { "Description" to it },
+            dateTimeStep?.takeIf { rules.captureDate }?.let { "Date/time" to it },
+            descriptionStep?.takeIf { rules.captureDescription }?.let { "Description" to it },
+            feeStep?.takeIf { rules.captureFee }?.let { "Fee" to it },
         ).firstOrNull { (_, step) -> step.error != null }
 
         val failure = when {
@@ -203,19 +230,26 @@ object SmsParser {
         }
         if (failure != null) return copy(failure = failure)
 
-        val finalDescription = if (balance != null) {
-            if (!description.isNullOrBlank()) "$description\n(Bal: $balance)" else "(Bal: $balance)"
+        val capturedDescription = description.takeIf { rules.captureDescription }
+        val capturedBalance = balance.takeIf { rules.captureBalance }
+        val finalDescription = if (capturedBalance != null) {
+            if (!capturedDescription.isNullOrBlank()) {
+                "$capturedDescription\n(Bal: $capturedBalance)"
+            } else {
+                "(Bal: $capturedBalance)"
+            }
         } else {
-            description
+            capturedDescription
         }
         return copy(
             transaction = ParsedSmsTransaction(
                 amount = amount!!,
                 type = type,
-                dateTimeMillis = parsedDateTimeMillis ?: receivedAtMillis,
+                dateTimeMillis = parsedDateTimeMillis?.takeIf { rules.captureDate } ?: receivedAtMillis,
                 title = title(type, accountName, body),
                 description = finalDescription,
-                balance = balance.toAmount(),
+                balance = capturedBalance.toAmount(),
+                fee = fee?.takeIf { rules.captureFee && it > 0.0 },
             )
         )
     }
@@ -244,6 +278,8 @@ object SmsParser {
     private fun String?.orNullIfBlank(): String? = this?.takeIf { it.isNotBlank() }
 
     private fun String?.toAmount(): Double? = this?.replace(",", "")?.toDoubleOrNull()
+
+    private fun String.toBigDecimalAmount(): BigDecimal? = replace(",", "").toBigDecimalOrNull()
 
     /** Groups are (day)(month)(year), optionally followed by (hour)(minute)(second). */
     fun parseDateTimeGroups(groups: List<String?>, receivedAtMillis: Long): Long? {
@@ -296,6 +332,9 @@ object SmsParser {
         val typePrefix = if (type == TransactionType.INCOME) "IN" else "OUT"
         return "AUTO $typePrefix $accountName ${generateHash(body)}"
     }
+
+    /** Title of the fee expense saved next to the SMS's transaction, sharing its code. */
+    fun feeTitle(accountName: String, body: String): String = "AUTO FEE $accountName ${generateHash(body)}"
 
     private fun generateHash(text: String): String {
         return MessageDigest.getInstance("MD5")

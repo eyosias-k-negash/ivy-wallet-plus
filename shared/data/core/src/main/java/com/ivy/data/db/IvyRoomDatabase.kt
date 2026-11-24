@@ -81,9 +81,10 @@ import com.ivy.domain.db.migration.Migration125to126_Tags
         AutoMigration(from = 131, to = 132),
         AutoMigration(from = 132, to = 133),
         AutoMigration(from = 133, to = 134),
-        AutoMigration(from = 134, to = 135)
+        AutoMigration(from = 134, to = 135),
+        AutoMigration(from = 135, to = 136)
     ],
-    version = 135,
+    version = 136,
     exportSchema = true
 )
 @TypeConverters(RoomTypeConverters::class)

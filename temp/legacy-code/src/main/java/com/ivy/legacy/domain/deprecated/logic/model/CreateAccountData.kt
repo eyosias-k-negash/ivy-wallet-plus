@@ -25,4 +25,9 @@ data class CreateAccountData(
     val smsBalanceRegex: String? = null,
     val autoTagId: UUID? = null,
     val smsCaptureLocation: Boolean = true,
+    val smsFeeRegex: String? = null,
+    val smsCaptureDate: Boolean = true,
+    val smsCaptureFee: Boolean = false,
+    val smsCaptureDescription: Boolean = true,
+    val smsCaptureBalance: Boolean = true,
 )

@@ -524,10 +524,24 @@ private fun LazyListScope.multiRegexSteps(result: SmsParseResult) {
             needsGroups = true,
             groupLabels = listOf("balance"),
             outcome = when {
-                result.balance != null -> "Appended to the description as \"(Bal: ${result.balance})\"." to UI.colors.green
+                result.balance != null && !result.rules.captureBalance ->
+                    "Found \"${result.balance}\", but Balance is off in the Capture menu: " +
+                        "it isn't added or checked." to UI.colors.orange
+                result.balance != null ->
+                    "Appended to the description as \"(Bal: ${result.balance})\", then checked " +
+                        "against the app's balance." to UI.colors.green
                 result.balanceStep?.isSet != true -> "Not set." to UI.colors.gray
                 else -> "No balance captured." to UI.colors.orange
             }
+        )
+    }
+    item {
+        StepCard(
+            title = "Fee",
+            step = result.feeStep,
+            needsGroups = true,
+            showAllMatches = true,
+            outcome = feeOutcome(result)
         )
     }
 }
@@ -555,6 +569,9 @@ private fun dateOutcome(result: SmsParseResult): Pair<String, Color> {
     val parsed = result.parsedDateTimeMillis
     val firstMatch = step?.matches?.firstOrNull()
     return when {
+        parsed != null && !result.rules.captureDate ->
+            "Found ${parsed.formatWith(fullDateFormatter)}, but Date is off in the Capture menu: " +
+                "the SMS receive time is used." to UI.colors.orange
         parsed != null -> "Date: ${parsed.formatWith(fullDateFormatter)}" to UI.colors.green
         step == null || !step.isSet -> "Not set: the SMS receive time is used." to UI.colors.gray
         firstMatch == null -> "No match: the SMS receive time is used." to UI.colors.orange
@@ -569,10 +586,32 @@ private fun descriptionOutcome(result: SmsParseResult): Pair<String, Color> {
     val step = result.descriptionStep
     return when {
         step == null || !step.isSet -> "Not set: no description." to UI.colors.gray
+        result.description != null && !result.rules.captureDescription ->
+            "Found, but Description is off in the Capture menu: no description." to UI.colors.orange
         result.description != null ->
             "Every group of every match, joined with new lines (see the result below)." to UI.colors.green
         step.matched -> "Matched, but no group captured any text." to UI.colors.red
         else -> "No match: no description." to UI.colors.red
+    }
+}
+
+@Composable
+private fun feeOutcome(result: SmsParseResult): Pair<String, Color> {
+    val step = result.feeStep
+    val fee = result.fee
+    return when {
+        step == null || !step.isSet -> "Not set: no fee." to UI.colors.gray
+        fee == null && step.matches.none { match -> match.groups.any { it != null } } ->
+            if (step.matched) {
+                "Matched, but no group captured the fee." to UI.colors.red
+            } else {
+                "No match: no fee." to UI.colors.gray
+            }
+        fee == null -> "A group isn't a number after removing commas: no fee." to UI.colors.red
+        !result.rules.captureFee ->
+            "Fee ${fee.plain()}, but Fee is off in the Capture menu: no fee expense." to UI.colors.orange
+        fee <= 0.0 -> "Fee is ${fee.plain()}: no fee expense." to UI.colors.gray
+        else -> "Fee ${fee.plain()}: every group added up, saved as its own expense." to UI.colors.green
     }
 }
 
@@ -816,7 +855,8 @@ private fun SingleRegexSummary(result: SmsParseResult) {
             )
         )
         Text(
-            text = "Type ${result.type}, from keywords. Description and date aren't parsed in this mode.",
+            text = "Type ${result.type}, from keywords. Date, description, balance and fee " +
+                "aren't parsed in this mode.",
             style = UI.typo.c.style(color = UI.colors.gray, fontWeight = FontWeight.Medium)
         )
     }
@@ -846,7 +886,11 @@ private fun ResultCard(
             ResultField(
                 "Date",
                 transaction.dateTimeMillis.formatWith(fullDateFormatter) +
-                    if (result.parsedDateTimeMillis != null) " (from the SMS text)" else " (receive time)"
+                    if (result.parsedDateTimeMillis != null && result.rules.captureDate) {
+                        " (from the SMS text)"
+                    } else {
+                        " (receive time)"
+                    }
             )
             ResultField("Title", transaction.title)
             FieldLabel("Description")
@@ -856,11 +900,16 @@ private fun ResultCard(
             } else {
                 Text(text = visibleText(description), style = monoStyle())
             }
+            transaction.fee?.let { fee ->
+                Spacer(Modifier.height(4.dp))
+                ResultField("Fee", "${fee.plain()}, saved as its own expense in the Fees category")
+            }
             Spacer(Modifier.height(8.dp))
             Text(
                 text = if (canAddTransaction) {
                     "\"Add transaction\" opens a new transaction with these details. " +
-                        "Nothing is saved until you add it there."
+                        "Nothing is saved until you add it there." +
+                        if (transaction.fee != null) " The fee isn't included: add it as its own expense." else ""
                 } else {
                     "Save the account to add SMS like this one as transactions from here."
                 },

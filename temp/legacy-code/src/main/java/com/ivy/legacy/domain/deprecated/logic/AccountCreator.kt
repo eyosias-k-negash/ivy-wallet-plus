@@ -64,6 +64,11 @@ class AccountCreator @Inject constructor(
                     smsBalanceRegex = data.smsBalanceRegex,
                     autoTagId = autoTagId,
                     smsCaptureLocation = data.smsCaptureLocation,
+                    smsFeeRegex = data.smsFeeRegex,
+                    smsCaptureDate = data.smsCaptureDate,
+                    smsCaptureFee = data.smsCaptureFee,
+                    smsCaptureDescription = data.smsCaptureDescription,
+                    smsCaptureBalance = data.smsCaptureBalance,
                 )
             }.getOrNull() ?: return@ioThread
             accountRepository.save(account)
@@ -90,6 +95,11 @@ class AccountCreator @Inject constructor(
                 smsBalanceRegex = data.smsBalanceRegex,
                 autoTagId = autoTagId?.value,
                 smsCaptureLocation = data.smsCaptureLocation,
+                smsFeeRegex = data.smsFeeRegex,
+                smsCaptureDate = data.smsCaptureDate,
+                smsCaptureFee = data.smsCaptureFee,
+                smsCaptureDescription = data.smsCaptureDescription,
+                smsCaptureBalance = data.smsCaptureBalance,
                 id = account.id.value
             )
             accountLogic.adjustBalance(
