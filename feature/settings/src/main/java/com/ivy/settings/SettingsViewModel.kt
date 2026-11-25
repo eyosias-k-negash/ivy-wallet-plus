@@ -15,6 +15,9 @@ import androidx.lifecycle.viewModelScope
 import com.ivy.base.legacy.SharedPrefs
 import com.ivy.base.legacy.Theme
 import com.ivy.base.legacy.refreshWidget
+import com.ivy.data.attachment.AttachmentStorage
+import com.ivy.data.attachment.AttachmentType
+import com.ivy.data.attachment.AttachmentUsage
 import com.ivy.data.backup.BackupDataUseCase
 import com.ivy.data.db.dao.read.SettingsDao
 import com.ivy.data.db.dao.write.WriteSettingsDao
@@ -57,6 +60,7 @@ class SettingsViewModel @Inject constructor(
     private val updateSettingsAct: UpdateSettingsAct,
     private val settingsWriter: WriteSettingsDao,
     private val exportCsvUseCase: ExportCsvUseCase,
+    private val attachmentStorage: AttachmentStorage,
     @ApplicationContext private val context: Context
 ) : ComposeViewModel<SettingsState, SettingsEvent>() {
 
@@ -70,6 +74,7 @@ class SettingsViewModel @Inject constructor(
     private val treatTransfersAsIncomeExpense = mutableStateOf(false)
     private val startDateOfMonth = mutableIntStateOf(1)
     private val progressState = mutableStateOf(false)
+    private val attachmentUsage = mutableStateOf<Map<AttachmentType, AttachmentUsage>>(emptyMap())
 
     @Composable
     override fun uiState(): SettingsState {
@@ -88,7 +93,8 @@ class SettingsViewModel @Inject constructor(
             startDateOfMonth = getStartDateOfMonth(),
             progressState = getProgressState(),
             hideIncome = getHideIncome(),
-            languageOptionVisible = isLanguageOptionVisible()
+            languageOptionVisible = isLanguageOptionVisible(),
+            attachmentUsage = getAttachmentUsage()
         )
     }
 
@@ -102,6 +108,7 @@ class SettingsViewModel @Inject constructor(
         initializeHideIncome()
         initializeTransfersAsIncomeExpense()
         initializeStartDateOfMonth()
+        initializeAttachmentUsage()
     }
 
     private suspend fun initializeCurrency() {
@@ -151,6 +158,10 @@ class SettingsViewModel @Inject constructor(
 
     private suspend fun initializeStartDateOfMonth() {
         startDateOfMonth.intValue = startDayOfMonthAct(Unit)
+    }
+
+    private suspend fun initializeAttachmentUsage() {
+        attachmentUsage.value = attachmentStorage.usage()
     }
 
     @Composable
@@ -203,6 +214,11 @@ class SettingsViewModel @Inject constructor(
         return progressState.value
     }
 
+    @Composable
+    private fun getAttachmentUsage(): Map<AttachmentType, AttachmentUsage> {
+        return attachmentUsage.value
+    }
+
     private fun isLanguageOptionVisible(): Boolean {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
     }
@@ -233,6 +249,7 @@ class SettingsViewModel @Inject constructor(
             SettingsEvent.DeleteCloudUserData -> deleteCloudUserData()
             SettingsEvent.DeleteAllUserData -> deleteAllUserData()
             SettingsEvent.SwitchLanguage -> switchLanguage()
+            is SettingsEvent.PurgeAttachments -> purgeAttachments(event.type)
         }
     }
 
@@ -394,6 +411,13 @@ class SettingsViewModel @Inject constructor(
     private fun logout() {
         viewModelScope.launch {
             logoutLogic.logout()
+        }
+    }
+
+    private fun purgeAttachments(type: AttachmentType) {
+        viewModelScope.launch {
+            attachmentStorage.purge(type)
+            attachmentUsage.value = attachmentStorage.usage()
         }
     }
 

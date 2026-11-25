@@ -190,6 +190,9 @@ interface TransactionDao {
     @Query("SELECT COUNT(*) FROM transactions WHERE isDeleted = 0 AND dateTime IS NOT null")
     suspend fun countHappenedTransactions(): Long
 
+    @Query("SELECT * FROM transactions WHERE attachmentUrl IS NOT NULL")
+    suspend fun findAllWithAttachment(): List<TransactionEntity>
+
     // Smart Title Suggestions
     @Query("SELECT * FROM transactions WHERE title LIKE :pattern AND isDeleted = 0")
     suspend fun findAllByTitleMatchingPattern(pattern: String): List<TransactionEntity>

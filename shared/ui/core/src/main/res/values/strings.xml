@@ -514,4 +514,24 @@
     <string name="location_attached">Location attached</string>
     <string name="remove_location">Remove location</string>
     <string name="msg_turn_on_location">Please turn on your location services</string>
+    <string name="disk_usage">Disk usage</string>
+    <string name="disk_usage_description">%1$s used by images and audio notes</string>
+    <string name="disk_usage_modal_description">Images and audio notes attached to your transactions are stored on this device. Purge them to free up space.</string>
+    <string name="images">Images</string>
+    <string name="audio_notes">Audio notes</string>
+    <plurals name="attachment_files">
+        <item quantity="one">%1$d file · %2$s</item>
+        <item quantity="other">%1$d files · %2$s</item>
+    </plurals>
+    <string name="purge">Purge</string>
+    <string name="purge_images_question">Purge all images?</string>
+    <string name="purge_audio_notes_question">Purge all audio notes?</string>
+    <plurals name="purge_images_warning">
+        <item quantity="one">This deletes %1$d image (%2$s) from this device and removes it from its transaction. The transaction is kept. Backups don\'t include attachments, so the image can\'t be restored.</item>
+        <item quantity="other">This deletes %1$d images (%2$s) from this device and removes them from their transactions. The transactions are kept. Backups don\'t include attachments, so the images can\'t be restored.</item>
+    </plurals>
+    <plurals name="purge_audio_notes_warning">
+        <item quantity="one">This deletes %1$d audio note (%2$s) from this device and removes it from its transaction. The transaction is kept. Backups don\'t include attachments, so the audio note can\'t be restored.</item>
+        <item quantity="other">This deletes %1$d audio notes (%2$s) from this device and removes them from their transactions. The transactions are kept. Backups don\'t include attachments, so the audio notes can\'t be restored.</item>
+    </plurals>
 </resources>

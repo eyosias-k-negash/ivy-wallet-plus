@@ -40,6 +40,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.ivy.base.legacy.Theme
 import com.ivy.base.model.TransactionType
+import com.ivy.data.attachment.AttachmentType
 import com.ivy.data.model.Category
 import com.ivy.data.model.Location
 import com.ivy.data.model.Tag
@@ -530,9 +531,8 @@ private fun BoxWithConstraintsScope.UI(
                 onClick = { showAttachmentOptions = true }
             )
         } else {
-            val isAudio = attachmentUrl.endsWith(".m4a", ignoreCase = true) || 
-                          attachmentUrl.endsWith(".mp3", ignoreCase = true)
-            
+            val isAudio = AttachmentType.of(attachmentUrl) == AttachmentType.Audio
+
             AddPrimaryAttributeButton(
                 icon = if (isAudio) R.drawable.ic_vue_media_microphone else R.drawable.ic_attachment,
                 text = stringResource(if (isAudio) R.string.audio_note_attached else R.string.image_attached),
