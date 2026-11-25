@@ -1,6 +1,6 @@
 # Writing SMS patterns
 
-This guide is for writing the patterns that turn a bank's or wallet's SMS into transactions, and for sharing them with other people as a config file. The [README](../README.md#transactions-from-bank-sms) covers setting up an account.
+This guide is for writing the patterns that turn a bank's or wallet's SMS into transactions, and for sharing them with other people as a config file. The [user guide](User-Guide.md#transactions-from-bank-sms) covers setting up an account.
 
 Patterns are Java regular expressions. Every pattern runs case-insensitive, with `DOTALL` (`.` also matches new lines) and `MULTILINE` (`^` and `$` match at each line).
 
@@ -17,7 +17,7 @@ The order of the groups doesn't matter, so `(?<year>\d{4})-(?<month>\d{2})-(?<da
 | Name | Read from | What it holds |
 |---|---|---|
 | `amount` | Amount, master | The transaction amount. Commas are removed, so `1,250.00` is 1250. |
-| `balance` | Balance, master | The balance after the transaction. It's added to the description as `(Bal: …)` and [checked against the app](../README.md#out-of-sync-warnings). |
+| `balance` | Balance, master | The balance after the transaction. It's added to the description as `(Bal: …)` and [checked against the app](User-Guide.md#out-of-sync-warnings). |
 | `description` | Description, master | Text for the description. Every `description` group that takes part, from every match, goes on its own line. |
 | `fee` | Fee, master | A fee charged with the transaction. Every `fee` group that takes part, from every match, is added up, so a service charge and its VAT become one fee. With **Fee** ticked in the Capture menu, it's saved as its own expense in the Fees category. |
 | `income`, `expense` | Master | If the group takes part in the match, it sets the transaction type. |

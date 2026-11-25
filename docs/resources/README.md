@@ -1,8 +1,6 @@
-# Resources 📚
+# Resources
 
-Here you can find various programming resources that we found useful.
-Before you explore them we recommend checking our own **[Developer Guidelines 🏗️](../Guidelines.md)** for a quick start
-with core concepts and ideas. Then you can deep dive with:
+Programming resources recommended by the original Ivy Wallet team. Start with the **[developer guidelines](../Guidelines.md)** for the core concepts, then dive deeper with:
 
 - [Videos](Videos.md)
 - [Books](Books.md)
