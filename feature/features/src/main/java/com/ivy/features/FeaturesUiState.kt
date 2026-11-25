@@ -1,9 +1,11 @@
 package com.ivy.features
 
+import com.ivy.data.model.TagId
 import kotlinx.collections.immutable.ImmutableList
 
 data class FeaturesUiState(
     val featureItemViewStates: ImmutableList<FeatureItemViewState>,
+    val statsTags: ImmutableList<StatsTagViewState>,
 )
 
 sealed interface FeatureItemViewState {
@@ -16,3 +18,10 @@ sealed interface FeatureItemViewState {
 
     data class FeatureHeaderViewState(val name: String) : FeatureItemViewState
 }
+
+@Suppress("DataClassTypedIDs")
+data class StatsTagViewState(
+    val id: TagId,
+    val name: String,
+    val excluded: Boolean,
+)

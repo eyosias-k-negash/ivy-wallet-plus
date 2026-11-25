@@ -84,7 +84,8 @@ class SearchViewModel @Inject constructor(
                 trnsWithDateDivsAct(
                     TrnsWithDateDivsAct.Input(
                         baseCurrency = baseCurrencyAct(Unit),
-                        transactions = filteredTransactions
+                        transactions = filteredTransactions,
+                        excludedFromStats = emptySet()
                     )
                 ).toImmutableList()
             }

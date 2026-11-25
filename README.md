@@ -18,6 +18,7 @@ Ivy Wallet Plus builds on the Ivy Wallet money manager. It adds:
 - [Alerts for overdue planned payments](#overdue-planned-payment-alerts)
 - [Planned payments in budgets](#planned-payments-in-budgets), shown as a lighter fill
 - [Changing a transaction's type](#changing-a-transactions-type) between income, expense and transfer, keeping its details
+- [Tags left out of income and expense](#tags-left-out-of-income-and-expense) on the Home screen
 - A [tidier reports filter](#reports-filter)
 - The [Ivy Wallet+ name and logo](#ivy-wallet-name-and-logo)
 
@@ -147,6 +148,10 @@ On the transaction screen, tap the type button at the top (**Income**, **Expense
 Until you pick the missing account, the app asks for it and the transfer can't be saved, so an existing transaction keeps its old type. If you switch back before picking one, the original account comes back. When an income becomes a transfer, the destination keeps receiving the income's amount. If the source is in another currency, the amount sent is worked out from it at the current exchange rate. Changing either account or the rate on the exchange-rate card works it out again. Once you type the amount sent yourself, the transfer works like any other: the amount sent stays and the amount received follows the rate.
 
 A loan's own transaction can't become a transfer, and a loan record's type still can't be changed.
+
+## Tags left out of income and expense
+
+Some transactions aren't really income or spending, like moving money between your own accounts or paying for something you'll be paid back for. Tag them, then go to **Settings → Advanced features → Income and expense**, tap **Exclude tags from income and expense** and tick those tags. Transactions with any ticked tag no longer count toward the Home screen's **Income** and **Expenses** for the period, each day's total in the Home history, or the balance widget's income and expense. They're still listed in the history and still count toward account balances. Other screens, such as Reports and an account's or category's transactions, keep counting them. The excluded tags are saved on the phone, not in backups.
 
 ## Reports filter
 

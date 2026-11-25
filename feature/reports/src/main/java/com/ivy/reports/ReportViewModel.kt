@@ -259,7 +259,8 @@ class ReportViewModel @Inject constructor(
                 trnsWithDateDivsAct(
                     TrnsWithDateDivsAct.Input(
                         baseCurrency = baseCurrency,
-                        transactions = tempHistory
+                        transactions = tempHistory,
+                        excludedFromStats = emptySet()
                     )
                 )
             }

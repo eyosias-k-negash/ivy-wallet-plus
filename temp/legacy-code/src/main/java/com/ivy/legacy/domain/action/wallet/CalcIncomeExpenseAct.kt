@@ -2,6 +2,7 @@ package com.ivy.wallet.domain.action.wallet
 
 import arrow.core.nonEmptyListOf
 import arrow.core.toOption
+import com.ivy.domain.usecase.wallet.ExcludedStatsTagsUseCase
 import com.ivy.frp.action.FPAction
 import com.ivy.frp.action.thenMap
 import com.ivy.frp.then
@@ -20,12 +21,15 @@ import javax.inject.Inject
 
 class CalcIncomeExpenseAct @Inject constructor(
     private val accTrnsAct: AccTrnsAct,
-    private val exchangeAct: ExchangeAct
+    private val exchangeAct: ExchangeAct,
+    private val excludedStatsTagsUseCase: ExcludedStatsTagsUseCase
 ) : FPAction<CalcIncomeExpenseAct.Input, IncomeExpensePair>() {
 
     override suspend fun Input.compose(): suspend () -> IncomeExpensePair = suspend {
-        filterExcluded(accounts)
-    } thenMap { acc ->
+        excludedStatsTagsUseCase.excludedTransactionIds()
+    } then { excludedTrnIds ->
+        filterExcluded(accounts).map { it to excludedTrnIds }
+    } thenMap { (acc, excludedTrnIds) ->
         Pair(
             acc,
             accTrnsAct(
@@ -33,7 +37,7 @@ class CalcIncomeExpenseAct @Inject constructor(
                     accountId = acc.id,
                     range = range
                 )
-            )
+            ).filterNot { it.id.value in excludedTrnIds }
         )
     } thenMap { (acc, trns) ->
         Timber.i("acc: $acc, trns = ${trns.size}")
