@@ -1,6 +1,9 @@
-# 🏗️ Developer Guidelines
+# Developer guidelines
 
-The biggest challenge in software engineering is the fight against **complexity**. If you're planning to contribute to Ivy Wallet, we mainly care about two things:
+> [!NOTE]
+> These guidelines come from the original Ivy Wallet team and still apply to Ivy Wallet Plus. For how this fork's code is organized, see the [codebase guide](Codebase-Guide.md). For how to submit a change, see [Contributing](../CONTRIBUTING.md).
+
+The biggest challenge in software engineering is the fight against **complexity**. If you're planning to contribute, we mainly care about two things:
 
 1. Your PR works and doesn't break anything.
 2. Your PR is simple and doesn't add complexity.
@@ -15,12 +18,11 @@ Be **pragmatic**. Engineering is all about being practical and finding optimal t
 
 > Follow [the 80/20 principle](https://en.wikipedia.org/wiki/Pareto_principle) - from 20% effort comes 80% of the results.
 
-In Ivy Wallet we care about:
+We care about:
 
 - Software complexity
 - Stability
 - Simplicity
-
 
 To recap - **THINK** and keep it simple.
 

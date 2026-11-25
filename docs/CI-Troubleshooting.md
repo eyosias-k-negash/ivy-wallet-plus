@@ -1,20 +1,31 @@
 # Troubleshooting CI failures
 
-If you see any of the PR checks failing (❌) go to [Actions](https://github.com/eyosias-k-negash/ivy-wallet-plus/actions) and find it there. Or simply click "Details" next to the failed check and explore the logs to see why it has failed.
+Every pull request and every push to `main` runs the checks below on GitHub Actions. If one fails (❌), click **Details** next to it, or find the run under [Actions](https://github.com/eyosias-k-negash/ivy-wallet-plus/actions), and read the log to see why.
+
+| Check | Workflow | Run it locally |
+|---|---|---|
+| [Detekt](#detekt) | `detekt.yml` | `./gradlew detekt` |
+| [Lint](#lint) | `lint.yml` | `./gradlew lintRelease` |
+| [Unit tests](#unit-tests) | `test.yml` | `./gradlew testDebugUnitTest` |
+| [Composables stability](#compose-stability) | `compose_stability.yml` | See below |
+| [Paparazzi screenshot tests](#paparazzi-tests) | `paparazzi_screenshot_test.yml` | `./gradlew verifyPaparazziDebug` |
+| [Integration tests](#integration-tests) | `integration_test.yml` | `./scripts/integrationTests.sh`, with a device or emulator connected |
+| [APK](#apk) | `apk.yml` | `./gradlew assembleDemo` |
+| [CI Actions tests](#ci-actions-tests) | `ci_actions_test.yml` | `./gradlew :ci-actions:base:test :ci-actions:compose-stability:test` |
 
 ## Detekt
-[Detekt](https://detekt.dev/) is a static code analyzer for Kotlin that we use to enforce code readability and good practices.
 
-**To run Detekt locally:**
-```
+[Detekt](https://detekt.dev/) is a static code analyzer for Kotlin that enforces readable code and good practices.
+
+```bash
 ./gradlew detekt
 ```
 
-If the Detekt errors are caused by a legacy code, you can suppress them using a baseline.
+> [!IMPORTANT]
+> Detekt already fails on `main`, mostly over fork code that isn't in the baseline, so this check fails on every pull request for now. Look in the report for the files you changed, and fix the findings you added. `scripts/detekt.sh` ends in `|| exit 0`, so it reports success even when Detekt fails.
 
-**Suppress Detekt** (only if you're sure that Detekt is wrong)
+**Suppress a finding** only if you're sure Detekt is wrong. Add `@Suppress("ID_OF_THE_CHECK")` to ignore it in one place:
 
-Add `@Suppress("ID_OF_THE_CHECK")` to ignore the error on a single place. For example:
 ```kotlin
 @Suppress("FunctionMaxLength")
 fun veryVeryLongFunction() {
@@ -22,64 +33,89 @@ fun veryVeryLongFunction() {
 }
 ```
 
-**Detekt baseline** (not recommended)
-```
+**Detekt baseline** (not recommended). If the findings are in legacy code, you can add them to the baseline:
+
+```bash
 ./scripts/detektBaseline.sh
 ```
 
 ## Lint
 
-We use the [standard Android Lint](https://developer.android.com/studio/write/lint) plus [Slack's compose-lints](https://slackhq.github.io/compose-lints/) as an addition to enforce proper Compose usage.
+The check runs the [standard Android Lint](https://developer.android.com/studio/write/lint) plus [Slack's compose-lints](https://slackhq.github.io/compose-lints/), which enforce proper Compose usage.
 
-**To run Lint locally:**
+```bash
+./gradlew lintRelease
 ```
-./scripts/lint.sh
-```
 
-If the Lint errors are caused by a legacy code, you can suppress them using a baseline.
+The report is written to `build/reports/lint/`. `scripts/lint.sh` runs the same task and opens the report with macOS's `open`.
 
-**Suppress Lint** (only if you're sure that Lint is wrong)
+**Suppress a finding** the same way as for Detekt, with `@Suppress("ID_OF_THE_CHECK")`, and only if you're sure Lint is wrong.
 
-Same as suppressing Detekt, just add `@Suppress("ID_OF_CHECK")`.
+**Lint baseline** (not recommended), for findings in legacy code:
 
-**Lint baseline** (not recommended)
-```
+```bash
 ./scripts/lintBaseline.sh
 ```
 
 ## Unit tests
 
-If this job is failing this means that your changes break an existing unit test. You must identify the failing tests and fix your code.
+A failure means your change breaks an existing unit test. Find the failing test and fix your code, or the test if the behavior change is intended.
 
-**To run the Unit tests locally:**
-```
+```bash
 ./gradlew testDebugUnitTest
 ```
 
-## Compose Stability
+To run one module or one class, for example the SMS parser tests:
 
-This GitHub Action checks whether your `@Composable` functions are stable (i.e. "restartable" and "skippable"). If it fails it means that some of your composables are unstable. That causes unnecessary recompositions which can lead to lost frames and laggy UI/UX especially when animation or scrolling. You must fix that! To fix it, open the failing working and see the output from the report - it tells you which `@Composable` functions are unstable and what parameters cause that.
-
-**Fixing Stability issues:**
-1. Read https://developer.android.com/jetpack/compose/performance/stability/fix
-2. https://developer.android.com/jetpack/compose/performance/stability
-
-**Compose Stability baseline** (not recommended)
+```bash
+./gradlew :temp:legacy-code:testDebugUnitTest --tests com.ivy.legacy.sms.SmsParserTest
 ```
+
+## Compose stability
+
+This check builds the demo APK with Compose compiler reports, then checks that your `@Composable` functions are stable, meaning restartable and skippable. Unstable composables recompose more than they need to, which can drop frames and make animations and scrolling lag.
+
+To fix a failure, open the failing run and read the report. It lists which `@Composable` functions are unstable and which parameters cause it. Then see Android's guides on [stability](https://developer.android.com/jetpack/compose/performance/stability) and [fixing stability issues](https://developer.android.com/jetpack/compose/performance/stability/fix).
+
+To run it locally:
+
+```bash
+./gradlew assembleDemo -PcomposeCompilerReports=true
+./gradlew :ci-actions:compose-stability:run
+```
+
+**Compose stability baseline** (not recommended). Use it only if the failure is in legacy code. The script commits the baseline for you. If it fails, open it and run its commands by hand.
+
+```bash
 ./scripts/composeStabilityBaseline.sh
 ```
-Do that only if the failure is in legacy code. If the script is failing, open it and execute the commands inside it manually.
 
+## Paparazzi tests
 
-## Paparazzi Tests
-Paparazzi is used for automated visual testing. It captures screenshots of various `@Composable` and then compares them against baseline images to detect any visual differences or regressions.
+[Paparazzi](https://github.com/cashapp/paparazzi) renders `@Composable` previews to images and compares them with the recorded ones, to catch visual changes.
 
-**Fixing Paparazzi issues:**
+1. Run `./gradlew verifyPaparazziDebug` to find the modules and screens that fail.
+2. Open the generated report to see what changed since the images were recorded.
+3. If the change is intended, record new images for that module with `./gradlew :<module>:recordPaparazziDebug`.
+4. Run `./gradlew :<module>:verifyPaparazziDebug` again to check that it passes.
+5. Repeat for every module that failed.
 
-1. Run `./gradlew verifyPaparazziDebug` locally to execute the Paparazzi tests and identify the specific screens where failures occur.
-2. Upon failure, the system generates detailed reports pinpointing the changes introduced since the last successful test run. Review these reports to understand the nature of the failures.
-3. If the identified changes are intentional, proceed by running `./gradlew {module_name}:recordPaparazziDebug` to update the baseline screenshots specifically for the failed UI components.
-4. After updating the baseline screenshots, rerun `./gradlew {module_name}:verifyPaparazziDebug` to ensure that the tests now pass with the updated baselines.
-5. Repeat this process iteratively for all modules that have failed Paparazzi tests, ensuring thorough validation and updating of baseline images as needed.
+> [!NOTE]
+> Use static data only. Dynamic data, such as the current date or time, makes the images differ on every run.
 
-> **Note**: Ensure the use of static data only. Dynamic data, such as current time or date, will cause test failures due to its variability.
+## Integration tests
+
+These run the `androidTest` tests of `shared:data:core` and `shared:domain` on an API 34 emulator. Locally, connect a device or start an emulator, then:
+
+```bash
+./gradlew :shared:data:core:connectedDebugAndroidTest
+./gradlew :shared:domain:connectedDebugAndroidTest
+```
+
+## APK
+
+Builds the demo APK and uploads it as the `Ivy-Wallet-Demo.apk` artifact of the run. If it fails, `./gradlew assembleDemo` shows the same compile or resource error locally.
+
+## CI Actions tests
+
+The `ci-actions` modules are small Kotlin programs used by CI, such as the Compose stability check. This runs their unit tests, so it only fails if you changed `ci-actions/`.
