@@ -13,6 +13,7 @@ import com.ivy.legacy.domain.pure.transaction.LegacyTrnDateDividers
 import com.ivy.legacy.domain.pure.transaction.transactionsWithDateDividers
 import com.ivy.wallet.domain.action.exchange.ExchangeAct
 import com.ivy.wallet.domain.action.exchange.actInput
+import java.util.UUID
 import javax.inject.Inject
 
 class TrnsWithDateDivsAct @Inject constructor(
@@ -29,13 +30,15 @@ class TrnsWithDateDivsAct @Inject constructor(
             getTags = { tagIds -> tagRepository.findByIds(tagIds) },
             getAccount = accountDao::findById then { it?.toLegacyDomain() },
             accountRepository = accountRepository,
-            exchange = ::actInput then exchangeAct
+            exchange = ::actInput then exchangeAct,
+            excludedFromStats = excludedFromStats
         )
     }
 
     data class Input(
         val baseCurrency: String,
-        val transactions: List<com.ivy.data.model.Transaction>
+        val transactions: List<com.ivy.data.model.Transaction>,
+        val excludedFromStats: Set<UUID>
     )
 }
 

@@ -69,6 +69,8 @@ suspend fun transactionsWithDateDividers(
     exchange: suspend (ExchangeData, BigDecimal) -> Option<BigDecimal>,
     @SideEffect
     getTags: suspend (tagIds: List<TagId>) -> List<Tag> = { emptyList() },
+    // Still listed, but left out of each day's income and expenses
+    excludedFromStats: Set<UUID> = emptySet(),
 ): List<TransactionHistoryItem> {
     if (transactions.isEmpty()) return emptyList()
     val transactionsMapper = TransactionMapper(accountRepository)
@@ -93,16 +95,19 @@ suspend fun transactionsWithDateDividers(
                         .toLegacyDomain(tags = getTags(it.tags).toImmutableLegacyTags())
                 }
             }
+            val countedTransactions = transactionsForDate.filterNot {
+                it.id.value in excludedFromStats
+            }
             listOf<TransactionHistoryItem>(
                 TransactionHistoryDateDivider(
                     date = date!!,
                     income = sumTrns(
-                        incomes(transactionsForDate),
+                        incomes(countedTransactions),
                         ::exchangeInBaseCurrency,
                         arg
                     ).toDouble(),
                     expenses = sumTrns(
-                        expenses(transactionsForDate),
+                        expenses(countedTransactions),
                         ::exchangeInBaseCurrency,
                         arg
                     ).toDouble()
