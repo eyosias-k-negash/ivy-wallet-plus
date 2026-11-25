@@ -8,9 +8,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.BoxWithConstraintsScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -26,6 +28,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -48,6 +53,7 @@ import com.ivy.wallet.domain.deprecated.logic.model.CreateAccountData
 import com.ivy.wallet.ui.theme.Gray
 import com.ivy.wallet.ui.theme.Ivy
 import com.ivy.wallet.ui.theme.components.IvyCheckboxWithText
+import com.ivy.wallet.ui.theme.components.IvyDescriptionTextField
 import com.ivy.wallet.ui.theme.modal.ChooseIconModal
 import com.ivy.wallet.ui.theme.modal.CurrencyModal
 import com.ivy.wallet.ui.theme.modal.IvyModal
@@ -78,6 +84,9 @@ fun BoxWithConstraintsScope.AccountModal(
     val account = modal?.account
     var nameTextFieldValue by remember(modal) {
         mutableStateOf(selectEndTextFieldValue(account?.name))
+    }
+    var descriptionTextFieldValue by remember(modal) {
+        mutableStateOf(selectEndTextFieldValue(account?.description))
     }
     var color by remember(modal) {
         mutableStateOf(account?.color?.let { Color(it) } ?: Ivy)
@@ -111,7 +120,7 @@ fun BoxWithConstraintsScope.AccountModal(
 
     // Every value that save() writes, so the form can tell whether leaving it would lose edits.
     val formValues = listOf<Any?>(
-        nameTextFieldValue.text, color, amount, currencyCode, icon, includeInBalance,
+        nameTextFieldValue.text, descriptionTextFieldValue.text, color, amount, currencyCode, icon, includeInBalance,
     ) + sms.values()
     val savedFormValues = remember(modal) { formValues }
     val hasUnsavedChanges = formValues != savedFormValues
@@ -171,6 +180,7 @@ fun BoxWithConstraintsScope.AccountModal(
                 save(
                     account = account,
                     nameTextFieldValue = nameTextFieldValue,
+                    description = descriptionTextFieldValue.text,
                     currency = currencyCode,
                     color = color,
                     icon = icon,
@@ -218,6 +228,26 @@ fun BoxWithConstraintsScope.AccountModal(
             showChooseIconModal = {
                 chooseIconModalVisible = true
             }
+        )
+
+        Spacer(Modifier.height(24.dp))
+
+        IvyDescriptionTextField(
+            modifier = Modifier
+                .padding(horizontal = 32.dp)
+                .fillMaxWidth(),
+            // Full width so tapping anywhere on the hint focuses the field.
+            textModifier = Modifier.fillMaxWidth(),
+            testTag = "account_modal_description",
+            value = descriptionTextFieldValue,
+            hint = stringResource(R.string.add_description),
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.Sentences,
+                autoCorrect = true,
+                keyboardType = KeyboardType.Text,
+                imeAction = ImeAction.Default
+            ),
+            onValueChanged = { descriptionTextFieldValue = it }
         )
 
         Spacer(Modifier.height(24.dp))
@@ -286,6 +316,7 @@ fun BoxWithConstraintsScope.AccountModal(
             save(
                 account = account,
                 nameTextFieldValue = nameTextFieldValue,
+                description = descriptionTextFieldValue.text,
                 currency = currencyCode,
                 color = color,
                 icon = icon,
@@ -389,6 +420,7 @@ fun BoxWithConstraintsScope.AccountModal(
 private fun save(
     account: Account?,
     nameTextFieldValue: TextFieldValue,
+    description: String,
     currency: String,
     color: Color,
     icon: String?,
@@ -400,10 +432,13 @@ private fun save(
     onEditAccount: (Account, balance: Double) -> Unit,
     dismiss: () -> Unit
 ) {
+    // A blank description is saved as none.
+    val savedDescription = description.trim().ifEmpty { null }
     if (account != null) {
         onEditAccount(
             account.copy(
                 name = nameTextFieldValue.text.trim(),
+                description = savedDescription,
                 currency = currency,
                 includeInBalance = includeInBalance,
                 icon = icon,
@@ -438,6 +473,7 @@ private fun save(
                 icon = icon,
                 balance = amount,
                 includeBalance = includeInBalance,
+                description = savedDescription,
                 smsAutoListenEnabled = sms.autoListenEnabled,
                 smsSenderPhone = sms.senderPhone.text,
                 smsSubscriptionId = sms.subscriptionId,

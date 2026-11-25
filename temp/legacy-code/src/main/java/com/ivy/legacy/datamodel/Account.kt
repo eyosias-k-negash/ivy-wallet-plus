@@ -23,6 +23,7 @@ data class Account(
     val icon: String? = null,
     val orderNum: Double = 0.0,
     val includeInBalance: Boolean = true,
+    val description: String? = null,
 
     val isSynced: Boolean = false,
     val isDeleted: Boolean = false,
@@ -56,6 +57,7 @@ data class Account(
         icon = icon,
         orderNum = orderNum,
         includeInBalance = includeInBalance,
+        description = description,
         isSynced = isSynced,
         isDeleted = isDeleted,
         smsAutoListenEnabled = smsAutoListenEnabled,
@@ -94,6 +96,7 @@ data class Account(
                 icon = icon?.let(IconAsset::from)?.getOrNull(),
                 includeInBalance = includeInBalance,
                 orderNum = orderNum,
+                description = description,
                 smsAutoListenEnabled = smsAutoListenEnabled,
                 smsSenderPhone = smsSenderPhone,
                 smsSubscriptionId = smsSubscriptionId,

@@ -47,6 +47,7 @@ class AccountMapperTest {
             icon = IconAsset.unsafe("icon"),
             includeInBalance = includeInBalance,
             orderNum = 3.14,
+            description = "Rent and bills",
         )
 
         // when
@@ -60,6 +61,7 @@ class AccountMapperTest {
             icon = "icon",
             includeInBalance = includeInBalance,
             orderNum = 3.14,
+            description = "Rent and bills",
             isSynced = true,
             isDeleted = false,
             id = ModelFixtures.AccountId.value,
@@ -77,6 +79,7 @@ class AccountMapperTest {
             orderNum = 42.0,
             includeInBalance = includeInBalance,
             isDeleted = removed,
+            description = "Rent and bills",
         )
 
         // when
@@ -94,8 +97,21 @@ class AccountMapperTest {
                 icon = IconAsset.unsafe("icon"),
                 includeInBalance = includeInBalance,
                 orderNum = 42.0,
+                description = "Rent and bills",
             )
         }
+    }
+
+    @Test
+    fun `maps entity to domain - missing description is okay`() = runTest {
+        // given
+        val noDescriptionEntity = ValidEntity.copy(description = null)
+
+        // when
+        val result = with(mapper) { noDescriptionEntity.toDomain() }
+
+        // then
+        result.shouldBeRight().description shouldBe null
     }
 
     @Test

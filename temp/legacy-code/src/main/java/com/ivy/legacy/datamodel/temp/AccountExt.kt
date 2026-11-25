@@ -10,6 +10,7 @@ fun AccountEntity.toLegacyDomain(): Account = Account(
     icon = icon,
     orderNum = orderNum,
     includeInBalance = includeInBalance,
+    description = description,
     isSynced = isSynced,
     isDeleted = isDeleted,
     smsAutoListenEnabled = smsAutoListenEnabled,
