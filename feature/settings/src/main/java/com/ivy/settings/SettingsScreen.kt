@@ -480,7 +480,7 @@ private fun BoxWithConstraintsScope.UI(
 
             val rootActivity = rootScreen()
             RequestFeature {
-                rootActivity.openUrlInBrowser(Constants.URL_GITHUB_NEW_ISSUE)
+                rootActivity.openUrlInBrowser(Constants.URL_CONTACT)
             }
 
             Spacer(Modifier.height(12.dp))
@@ -749,7 +749,7 @@ private fun HelpCenter() {
         icon = R.drawable.ic_custom_education_m,
         text = stringResource(R.string.help_center),
     ) {
-        uriHandler.openUri(Constants.URL_HELP_CENTER)
+        uriHandler.openUri(Constants.URL_USER_GUIDE)
     }
 }
 
@@ -761,7 +761,7 @@ private fun ReportBug() {
         text = stringResource(R.string.report_bug),
         iconPadding = 10.dp,
     ) {
-        uriHandler.openUri(Constants.URL_GITHUB_NEW_ISSUE)
+        uriHandler.openUri(Constants.URL_CONTACT)
     }
 }
 
@@ -784,7 +784,7 @@ private fun ContactSupport() {
         icon = R.drawable.ic_support,
         text = stringResource(R.string.contact_support),
     ) {
-        rootActivity.openUrlInBrowser(Constants.URL_IVY_TELEGRAM_INVITE)
+        rootActivity.openUrlInBrowser(Constants.URL_CONTACT)
     }
 }
 
