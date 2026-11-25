@@ -1,6 +1,8 @@
 package com.ivy.settings
 
 import com.ivy.base.legacy.Theme
+import com.ivy.data.attachment.AttachmentType
+import com.ivy.data.attachment.AttachmentUsage
 
 data class SettingsState(
     val currencyCode: String,
@@ -13,5 +15,6 @@ data class SettingsState(
     val treatTransfersAsIncomeExpense: Boolean,
     val startDateOfMonth: String,
     val progressState: Boolean,
-    val languageOptionVisible: Boolean
+    val languageOptionVisible: Boolean,
+    val attachmentUsage: Map<AttachmentType, AttachmentUsage>
 )

@@ -29,6 +29,7 @@ Attach a photo or a voice note, such as a receipt, an invoice or a reminder of w
 - **View or play:** once something is attached, the button reads **Image attached** or **Audio note attached**. Tap it to open the file in your image viewer or audio player.
 - **Remove:** long-press the button and confirm. The file is deleted too. Each transaction holds one attachment, so remove the current one before adding another.
 - **Spot:** transactions with an attachment show a paperclip next to the amount in transaction lists.
+- **Free up space:** **Settings → Disk usage** shows how much space images and audio notes take up. **Purge** next to either type deletes all of its files and removes them from their transactions, after you confirm. The transactions themselves stay.
 
 **How it's stored.** The app copies the file into its private storage (`files/attachments/`), so it stays available if you move or delete the original. The transaction keeps the copy's path in the `attachmentUrl` database column. Ivy Wallet's database already had that column but never filled it, so attachments need no migration. When you edit an existing transaction, attaching or removing a file saves right away. On a new transaction, it's saved when you save the transaction.
 
@@ -36,7 +37,8 @@ Attach a photo or a voice note, such as a receipt, an invoice or a reminder of w
 
 - **Audio note** opens a recorder app through Android's "record sound" request. Not every phone has a recorder that supports it. If yours doesn't, the app says "No voice recorder app found" and nothing is attached.
 - Backups don't include attachment files. A backup keeps each transaction's file path, so after restoring on another device the paperclip still shows but tapping it says "File not found".
-- Deleting a transaction leaves its attachment file in app storage.
+- Deleting a transaction leaves its attachment file in app storage. **Disk usage** counts these files too, and purging their type deletes them.
+- Purged files can't be brought back, since backups don't include them.
 
 ## Transactions from bank SMS
 

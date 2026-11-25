@@ -18,6 +18,8 @@ import com.ivy.base.legacy.refreshWidget
 import com.ivy.base.model.TransactionType
 import com.ivy.base.time.TimeConverter
 import com.ivy.base.time.TimeProvider
+import com.ivy.data.attachment.AttachmentStorage
+import com.ivy.data.attachment.AttachmentType
 import com.ivy.data.db.dao.read.LoanDao
 import com.ivy.data.db.dao.read.SettingsDao
 import com.ivy.data.model.Category
@@ -1303,10 +1305,9 @@ class EditTransactionViewModel @Inject constructor(
             file
         )
 
-        val mimeType = if (url.endsWith(".m4a", ignoreCase = true) || url.endsWith(".mp3", ignoreCase = true)) {
-            "audio/*"
-        } else {
-            "image/*"
+        val mimeType = when (AttachmentType.of(url)) {
+            AttachmentType.Audio -> "audio/*"
+            AttachmentType.Image -> "image/*"
         }
 
         val intent = Intent(Intent.ACTION_VIEW).apply {
@@ -1331,7 +1332,7 @@ class EditTransactionViewModel @Inject constructor(
     private suspend fun saveAttachment(uri: Uri, extension: String) {
         try {
             val inputStream = context.contentResolver.openInputStream(uri) ?: return
-            val attachmentsDir = File(context.filesDir, "attachments")
+            val attachmentsDir = AttachmentStorage.attachmentsDir(context)
             if (!attachmentsDir.exists()) {
                 attachmentsDir.mkdirs()
             }

@@ -30,6 +30,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -38,6 +39,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ivy.base.legacy.Theme
+import com.ivy.data.attachment.AttachmentType
+import com.ivy.data.attachment.AttachmentUsage
 import com.ivy.design.l0_system.UI
 import com.ivy.design.l0_system.style
 import com.ivy.design.l1_buildingBlocks.IconScale
@@ -98,6 +101,7 @@ fun BoxWithConstraintsScope.SettingsScreen() {
         nameLocalAccount = uiState.name,
         startDateOfMonth = uiState.startDateOfMonth.toInt(),
         languageOptionVisible = uiState.languageOptionVisible,
+        attachmentUsage = uiState.attachmentUsage,
         onSetCurrency = {
             viewModel.onEvent(SettingsEvent.SetCurrency(it))
         },
@@ -136,6 +140,9 @@ fun BoxWithConstraintsScope.SettingsScreen() {
         },
         onSwitchLanguage = {
             viewModel.onEvent(SettingsEvent.SwitchLanguage)
+        },
+        onPurgeAttachments = {
+            viewModel.onEvent(SettingsEvent.PurgeAttachments(it))
         }
     )
 }
@@ -157,6 +164,7 @@ private fun BoxWithConstraintsScope.UI(
     hideIncome: Boolean = false,
     progressState: Boolean = false,
     treatTransfersAsIncomeExpense: Boolean = false,
+    attachmentUsage: Map<AttachmentType, AttachmentUsage> = emptyMap(),
     onSetName: (String) -> Unit = {},
     onBackupData: () -> Unit = {},
     onExportToCSV: () -> Unit = {},
@@ -168,7 +176,8 @@ private fun BoxWithConstraintsScope.UI(
     onSetStartDateOfMonth: (Int) -> Unit = {},
     onDeleteAllUserData: () -> Unit = {},
     onDeleteCloudUserData: () -> Unit = {},
-    onSwitchLanguage: () -> Unit = {}
+    onSwitchLanguage: () -> Unit = {},
+    onPurgeAttachments: (AttachmentType) -> Unit = {}
 ) {
     var currencyModalVisible by remember { mutableStateOf(false) }
     var nameModalVisible by remember { mutableStateOf(false) }
@@ -176,6 +185,9 @@ private fun BoxWithConstraintsScope.UI(
     var deleteCloudDataModalVisible by remember { mutableStateOf(false) }
     var deleteAllDataModalVisible by remember { mutableStateOf(false) }
     var deleteAllDataModalFinalVisible by remember { mutableStateOf(false) }
+    var diskUsageModalVisible by remember { mutableStateOf(false) }
+    var purgeModalVisible by remember { mutableStateOf(false) }
+    var purgeType by remember { mutableStateOf(AttachmentType.Image) }
     val nav = navigation()
 
     LazyColumn(
@@ -384,6 +396,12 @@ private fun BoxWithConstraintsScope.UI(
 
             Spacer(Modifier.height(12.dp))
 
+            DiskUsage(attachmentUsage = attachmentUsage) {
+                diskUsageModalVisible = true
+            }
+
+            Spacer(Modifier.height(12.dp))
+
             CustomFeatures(
                 onClick = { nav.navigateTo(FeaturesScreen) }
             )
@@ -570,6 +588,47 @@ private fun BoxWithConstraintsScope.UI(
         }
     )
 
+    DiskUsageModal(
+        visible = diskUsageModalVisible,
+        usage = attachmentUsage,
+        dismiss = { diskUsageModalVisible = false },
+        onPurge = {
+            purgeType = it
+            diskUsageModalVisible = false
+            purgeModalVisible = true
+        }
+    )
+
+    val purgeUsage = attachmentUsage[purgeType] ?: AttachmentUsage(files = 0, bytes = 0)
+    DeleteModal(
+        title = stringResource(
+            when (purgeType) {
+                AttachmentType.Image -> R.string.purge_images_question
+                AttachmentType.Audio -> R.string.purge_audio_notes_question
+            }
+        ),
+        description = pluralStringResource(
+            when (purgeType) {
+                AttachmentType.Image -> R.plurals.purge_images_warning
+                AttachmentType.Audio -> R.plurals.purge_audio_notes_warning
+            },
+            purgeUsage.files,
+            purgeUsage.files,
+            formatFileSize(purgeUsage.bytes)
+        ),
+        buttonText = stringResource(R.string.purge),
+        visible = purgeModalVisible,
+        dismiss = {
+            purgeModalVisible = false
+            diskUsageModalVisible = true
+        },
+        onDelete = {
+            onPurgeAttachments(purgeType)
+            purgeModalVisible = false
+            diskUsageModalVisible = true
+        }
+    )
+
     ProgressModal(
         title = stringResource(R.string.exporting_data),
         description = stringResource(R.string.exporting_data_description),
@@ -617,6 +676,28 @@ private fun StartDateOfMonth(
 
         Spacer(Modifier.width(32.dp))
     }
+}
+
+@Composable
+private fun DiskUsage(
+    attachmentUsage: Map<AttachmentType, AttachmentUsage>,
+    onClick: () -> Unit
+) {
+    SettingsDefaultButton(
+        icon = R.drawable.ic_vue_files_folder,
+        text = stringResource(R.string.disk_usage),
+        iconPadding = 6.dp,
+        // Left out until the sizes are known, rather than showing 0 B for a moment
+        description = if (attachmentUsage.isEmpty()) {
+            null
+        } else {
+            stringResource(
+                R.string.disk_usage_description,
+                formatFileSize(attachmentUsage.values.sumOf { it.bytes })
+            )
+        },
+        onClick = onClick
+    )
 }
 
 @Composable

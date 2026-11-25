@@ -1,5 +1,6 @@
 package com.ivy.settings
 
+import com.ivy.data.attachment.AttachmentType
 import com.ivy.domain.RootScreen
 
 sealed interface SettingsEvent {
@@ -19,4 +20,5 @@ sealed interface SettingsEvent {
     data object DeleteCloudUserData : SettingsEvent
     data object DeleteAllUserData : SettingsEvent
     data object SwitchLanguage : SettingsEvent
+    data class PurgeAttachments(val type: AttachmentType) : SettingsEvent
 }

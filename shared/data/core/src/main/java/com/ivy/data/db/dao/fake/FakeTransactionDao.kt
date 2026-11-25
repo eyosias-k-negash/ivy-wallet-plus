@@ -246,6 +246,10 @@ class FakeTransactionDao : TransactionDao, WriteTransactionDao {
         return items.count { it.dateTime != null && !it.isDeleted }.toLong()
     }
 
+    override suspend fun findAllWithAttachment(): List<TransactionEntity> {
+        return items.filter { it.attachmentUrl != null }
+    }
+
     override suspend fun findAllByTitleMatchingPattern(pattern: String): List<TransactionEntity> {
         return items.filter { it.title?.contains(pattern) == true && !it.isDeleted }
             .sortedByDescending { it.dateTime }
