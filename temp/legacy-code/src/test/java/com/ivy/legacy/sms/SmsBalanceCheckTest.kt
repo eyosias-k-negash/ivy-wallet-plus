@@ -34,4 +34,23 @@ class SmsBalanceCheckTest {
         SmsBalanceCheck.difference(BigDecimal("10.00"), 10.01)!!
             .compareTo(BigDecimal("0.01")) shouldBe 0
     }
+
+    @Test
+    fun `a gap under 10 isn't worth a warning`() {
+        SmsBalanceCheck.warningDifference(BigDecimal("100.00"), 109.99) shouldBe null
+        SmsBalanceCheck.warningDifference(BigDecimal("100.00"), 90.01) shouldBe null
+    }
+
+    @Test
+    fun `a gap of 10 either way is warned about`() {
+        SmsBalanceCheck.warningDifference(BigDecimal("100.00"), 110.0)!!
+            .compareTo(BigDecimal("10")) shouldBe 0
+        SmsBalanceCheck.warningDifference(BigDecimal("100.00"), 90.0)!!
+            .compareTo(BigDecimal("-10")) shouldBe 0
+    }
+
+    @Test
+    fun `matching balances aren't warned about`() {
+        SmsBalanceCheck.warningDifference(BigDecimal("8400.50"), 8400.5) shouldBe null
+    }
 }

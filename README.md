@@ -94,13 +94,13 @@ New lines, no-break spaces and other invisible characters show as orange markers
 
 ### Out-of-sync warnings
 
-When a pattern reads the balance from the SMS and **Balance & rebalance** is on in the Capture menu, every SMS transaction (and its fee) is followed by a balance check. If the balance in the SMS differs from the account's balance in the app by a cent or more, an "Out of sync" notification shows both balances. Usually a transaction is missing, doubled or has the wrong amount. From the notification, you can:
+When a pattern reads the balance from the SMS and **Balance & rebalance** is on in the Capture menu, every SMS transaction (and its fee) is followed by a balance check. If the balance in the SMS differs from the account's balance in the app by 10 or more, in the account's currency, an "Out of sync" notification shows both balances. Smaller gaps don't trigger it. Usually a transaction is missing, doubled or has the wrong amount. From the notification, you can:
 
-- **Tap it** to open Add transaction with the account, your Rebalance category (reused if you have one, otherwise created) and the difference already filled in, as income if the app shows too little or an expense if it shows too much. The difference is worked out again when you tap, so it accounts for changes you made in the meantime, like correcting the SMS transaction. If nothing is left to fix, a message says so.
+- **Tap it** to open Add transaction with the account, your Rebalance category (reused if you have one, otherwise created) and the difference already filled in, as income if the app shows too little or an expense if it shows too much. The difference is worked out again when you tap, so it accounts for changes you made in the meantime, like correcting the SMS transaction. Whatever is left is filled in, even if it's now under 10. If nothing is left to fix, a message says so.
 - **Fix manually** to open the account's transactions and find the problem yourself.
 - **Dismiss** it.
 
-Each account has at most one warning. The next SMS for the account replaces it, or removes it once the balances match. Warnings use their own channel, **Account out of sync**, which you can turn off in Android's notification settings for the app. Unlike "Transaction created" notifications, they don't come back after a restart.
+Each account has at most one warning. The next SMS for the account replaces it, or removes it once the balances are less than 10 apart. Warnings use their own channel, **Account out of sync**, which you can turn off in Android's notification settings for the app. Unlike "Transaction created" notifications, they don't come back after a restart.
 
 ## Locations
 

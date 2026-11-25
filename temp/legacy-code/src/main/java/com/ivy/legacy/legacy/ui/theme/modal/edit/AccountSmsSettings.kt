@@ -448,7 +448,7 @@ private fun CaptureSection(state: SmsSettingsState) {
             note = regexNote(state.balanceRegex, SmsGroup.BALANCE).takeIf { state.captureBalance },
             details = (
                 "Adds the balance, from the Balance regex or the master's balance group, to the " +
-                    "description, and warns when it differs from the app's balance. Tapping the warning " +
+                    "description, and warns when it's 10 or more away from the app's balance. Tapping the warning " +
                     "adds the rebalancing transaction."
                 ).takeIf { expanded },
         )
