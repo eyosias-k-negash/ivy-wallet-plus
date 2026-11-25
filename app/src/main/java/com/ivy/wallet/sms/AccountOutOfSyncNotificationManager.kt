@@ -25,10 +25,11 @@ import java.util.UUID
 import javax.inject.Inject
 
 /**
- * Warns when a bank SMS reports a different balance than the app shows for its account.
+ * Warns when a bank SMS reports a balance 10 or more away from what the app shows for its
+ * account, in the account's currency.
  *
  * Each account has at most one warning. The next SMS for the account replaces it, or removes
- * it once the balances match again.
+ * it once the balances are less than 10 apart.
  */
 @Suppress("LongParameterList")
 class AccountOutOfSyncNotificationManager @Inject constructor(
@@ -46,7 +47,7 @@ class AccountOutOfSyncNotificationManager @Inject constructor(
     suspend fun check(account: Account, smsBalance: Double, transactionTime: Instant) {
         // The SMS's own time can be a little ahead of the phone's clock, and its transaction must count
         val appBalance = balance(account, until = maxOf(timeProvider.utcNow(), transactionTime))
-        val difference = SmsBalanceCheck.difference(appBalance, smsBalance)
+        val difference = SmsBalanceCheck.warningDifference(appBalance, smsBalance)
         if (difference == null) {
             dismiss(account.id.value)
         } else {
@@ -61,7 +62,8 @@ class AccountOutOfSyncNotificationManager @Inject constructor(
     /**
      * The Add transaction screen that brings the account to [smsBalance], in the Rebalance
      * category. The difference is worked out again because the user may have fixed some of it
-     * since the warning, for example by correcting the SMS transaction. Null when nothing is left.
+     * since the warning, for example by correcting the SMS transaction. What's left is offered
+     * even when it's under the warning threshold. Null when nothing is left.
      */
     suspend fun rebalanceScreen(accountId: UUID, smsBalance: Double): EditTransactionScreen? {
         val account = accountRepository.findById(AccountId(accountId)) ?: return null
