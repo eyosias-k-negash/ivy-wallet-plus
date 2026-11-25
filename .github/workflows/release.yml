@@ -1,0 +1,96 @@
+name: Release
+
+# Push a tag like v0.6.0 (matching version-name in gradle/libs.versions.toml) to build a signed
+# APK and attach it to a draft GitHub release. Review the draft's notes, then publish it.
+on:
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+
+permissions:
+  contents: write
+
+env:
+  # SHA-256 of the release signing certificate. Every release must be signed with this key,
+  # or Android refuses to install it over the previous one.
+  EXPECTED_CERT_SHA256: d8ed392d6ec9997d0265edd14d08e1e3f80b023c4e54f0e5cb18c53f8b15a987
+
+jobs:
+  release:
+    name: Build and draft the release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check the tag matches the app version
+        run: |
+          version_name=$(sed -n 's/^version-name = "\(.*\)"/\1/p' gradle/libs.versions.toml)
+          if [ "v$version_name" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME doesn't match version-name \"$version_name\" in gradle/libs.versions.toml"
+            exit 1
+          fi
+
+      - uses: ./.github/actions/setup
+
+      - name: Decode the signing keystore
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+        run: |
+          if [ -z "$SIGNING_KEY" ]; then
+            echo "::error::The SIGNING_KEY secret (base64 of the release keystore) is missing"
+            exit 1
+          fi
+          printf '%s' "$SIGNING_KEY" | base64 --decode > sign.jks
+
+      - name: Build the release APK
+        env:
+          SIGNING_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew :app:assembleRelease
+
+      - name: Check the signing certificate
+        run: |
+          apksigner="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -n 1)apksigner"
+          cert=$("$apksigner" verify --print-certs app/build/outputs/apk/release/app-release.apk \
+            | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')
+          echo "Signing certificate SHA-256: $cert"
+          if [ "$cert" != "$EXPECTED_CERT_SHA256" ]; then
+            echo "::error::The APK is signed with an unexpected certificate ($cert). Check the signing secrets."
+            exit 1
+          fi
+
+      - name: Prepare the release files
+        run: |
+          apk="ivy-wallet-plus-$GITHUB_REF_NAME.apk"
+          mv app/build/outputs/apk/release/app-release.apk "$apk"
+          sha256sum "$apk" > "$apk.sha256"
+          cat "$apk.sha256"
+
+      # Keep the R8 mapping file to read obfuscated stack traces from this release.
+      - name: Upload the R8 mapping file
+        uses: actions/upload-artifact@v7
+        with:
+          name: mapping-${{ github.ref_name }}
+          path: app/build/outputs/mapping/release/mapping.txt
+          retention-days: 90
+
+      - name: Create or update the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          files=(ivy-wallet-plus-"$GITHUB_REF_NAME".apk*)
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "${files[@]}" \
+              --draft --verify-tag --generate-notes \
+              --title "Ivy Wallet+ $GITHUB_REF_NAME"
+          fi
+
+      - name: Delete the keystore
+        if: always()
+        run: rm -f sign.jks

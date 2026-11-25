@@ -1,0 +1,15 @@
+name: Set up the build
+description: Installs JDK 17 and sets up Gradle with its dependency cache.
+
+runs:
+  using: composite
+  steps:
+    - name: Set up JDK 17
+      uses: actions/setup-java@v6
+      with:
+        distribution: temurin
+        java-version: '17'
+
+    # Stay on v5: from v6 the caching component is proprietary and needs its terms of use accepted.
+    - name: Set up Gradle
+      uses: gradle/actions/setup-gradle@v5
