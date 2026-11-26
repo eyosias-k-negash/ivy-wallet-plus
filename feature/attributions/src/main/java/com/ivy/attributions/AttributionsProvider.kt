@@ -81,12 +81,8 @@ class AttributionsProvider @Inject constructor() {
             link = "https://docs.gradle.org/current/userguide/kotlin_dsl.html"
         ),
         AttributionItem.Attribution(
-            name = "Fastlane",
-            link = "https://fastlane.tools"
-        ),
-        AttributionItem.Attribution(
             name = "Github Actions",
-            link = "https://github.com/Ivy-Apps/ivy-wallet/actions"
+            link = "https://github.com/eyosias-k-negash/ivy-wallet-plus/actions"
         ),
         AttributionItem.Attribution(
             name = "Timber",

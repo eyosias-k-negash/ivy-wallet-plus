@@ -1,3 +1,5 @@
+import com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -8,7 +10,6 @@ plugins {
     id("com.google.devtools.ksp")
     id("com.google.gms.google-services")
     id("com.google.firebase.crashlytics")
-    id("io.gitlab.arturbosch.detekt")
 }
 
 android {
@@ -57,6 +58,9 @@ android {
 
             signingConfig = signingConfigs.getByName("release")
 
+            // google-services.json still points to the original Ivy Wallet Firebase project.
+            configure<CrashlyticsExtension> { mappingFileUploadEnabled = false }
+
             resValue("string", "app_name", "Ivy Wallet+")
         }
 
@@ -87,6 +91,8 @@ android {
             isDefault = false
 
             signingConfig = signingConfigs.getByName("debug")
+
+            configure<CrashlyticsExtension> { mappingFileUploadEnabled = false }
 
             applicationIdSuffix = ".debug"
             resValue("string", "app_name", "Ivy Wallet+")

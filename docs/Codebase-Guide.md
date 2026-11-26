@@ -29,10 +29,25 @@ Most of the code is upstream Ivy Wallet. The fork started with the image attachm
 | Variant | Package | App name | Use it for |
 |---|---|---|---|
 | `debug` | `com.ivy.walletplus.debug` | Ivy Wallet+ Debug | Development. Greyscale launcher icon, so it's easy to tell apart. |
-| `demo` | `com.ivy.walletplus.debug` | Ivy Wallet+ | The APK that CI builds. Minified, signed with the committed debug key. |
-| `release` | `com.ivy.walletplus` | Ivy Wallet+ | Needs `sign.jks` and signing secrets, which aren't in the repository. |
+| `demo` | `com.ivy.walletplus.debug` | Ivy Wallet+ | A release-like build anyone can make. Minified, signed with the committed debug key. |
+| `release` | `com.ivy.walletplus` | Ivy Wallet+ | The APK on GitHub Releases. Built by the [Release workflow](#releasing), which has the signing key. |
 
 Debug and demo share a package, so installing one replaces the other. Neither replaces a release install.
+
+## Releasing
+
+Releases are built and signed by [`release.yml`](../.github/workflows/release.yml) when a version tag is pushed.
+
+1. On a branch, set `version-name` and raise `version-code` by one in [`gradle/libs.versions.toml`](../gradle/libs.versions.toml). Merge it into `main`.
+2. Tag the merge commit with the same version and push the tag:
+   ```bash
+   git tag v0.6.0 origin/main
+   git push origin v0.6.0
+   ```
+3. The workflow checks that the tag matches `version-name`, builds `assembleRelease` with the keystore from the `SIGNING_KEY` secret, and checks the APK's certificate against `EXPECTED_CERT_SHA256`. It then creates a **draft** release with `ivy-wallet-plus-v0.6.0.apk`, its `.sha256` file and notes generated from the merged pull requests. The R8 mapping file is kept as an artifact of the run.
+4. Edit the draft's notes and publish it. **Settings → Releases** in the app shows the notes. It lists each line as an item and skips headings, so use short bullet points.
+
+The signing secrets are `SIGNING_KEY` (the release keystore, base64-encoded), `KEYSTORE_PASSWORD`, `KEY_ALIAS` and `KEY_PASSWORD`. A release signed with any other key can't update an installed one, which is why the workflow fails on a certificate mismatch.
 
 ## Features and where they live
 
@@ -90,7 +105,7 @@ The Room database is `IvyRoomDatabase` in `shared/data/core`, at version 137. Ea
 `transactions.attachmentUrl` already existed upstream, so attachments needed no migration. [Contributing](../CONTRIBUTING.md#database-changes) has the checklist for adding a column.
 
 > [!WARNING]
-> The committed `130.json` was edited by the fork to include the location columns, so it no longer matches upstream's version 130. Don't edit committed schema files. Add a new version instead.
+> The committed `130.json` was edited by the fork to include the location columns, so it no longer matches upstream's version 130, and the 130 → 131 auto-migration is empty. `Migration129to130_LoanIncludeNote` adds the location columns too, so databases from older versions still migrate. Don't edit committed schema files. Add a new version instead.
 
 ## Notifications and background work
 
@@ -155,9 +170,7 @@ These are known and not fixed yet. They're good places to start.
 
 **Repository and build**
 
-- `./gradlew detekt` fails on `main`, mostly over fork code that isn't in the baseline. `scripts/detekt.sh` and `scripts/unitTests.sh` end in `|| exit 0` and always report success.
-- `app/google-services.json` still points at the original Ivy Wallet Firebase project, with the package names changed.
+- The Detekt and Lint baselines were regenerated for v0.6.0, so they also cover findings in fork code, such as long SMS functions and Compose rules in the SMS settings. Fixing those and removing them from the baselines is welcome.
+- `app/google-services.json` still points at the original Ivy Wallet Firebase project, with the package names changed. Crashlytics mapping uploads are off for that reason.
 - `gradle/wrapper/gradle-wrapper.properties` has no `distributionSha256Sum`.
-- `rootProject.name` is still `IvyWallet`, and the CI artifact is still called `Ivy-Wallet-Demo.apk`.
-- The in-app Attributions screen still lists Fastlane, which the fork removed.
 - New strings added by the fork are in English only.

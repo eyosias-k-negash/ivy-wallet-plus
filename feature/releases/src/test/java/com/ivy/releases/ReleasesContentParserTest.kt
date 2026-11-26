@@ -44,6 +44,26 @@ class ReleasesContentParserTest {
     }
 
     @Test
+    fun `toCommitsList - with Markdown release notes`() {
+        // given
+        val notes = "## What's new\r\n\r\n" +
+                "- **Exclude tags:** leave [chosen tags](https://example.com/guide) out of totals\r\n" +
+                "* Purge attachments from Settings\r\n\r\n" +
+                "### Fixes\r\n" +
+                "- Fix a crash without a voice recorder app"
+
+        // when
+        val res = releasesContentParser.toCommitsList(notes)
+
+        // then
+        res shouldBe persistentListOf(
+            "Exclude tags: leave chosen tags out of totals",
+            "Purge attachments from Settings",
+            "Fix a crash without a voice recorder app"
+        )
+    }
+
+    @Test
     fun `toReleaseDate - formats the date`() {
         // given
         val date = "2023-09-16T17:42:08Z"

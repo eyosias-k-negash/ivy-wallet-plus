@@ -8,16 +8,25 @@ import javax.inject.Inject
 class ReleasesContentParser @Inject constructor() {
     fun toCommitsList(commits: String?): ImmutableList<String> {
         if (commits.isNullOrBlank()) return persistentListOf()
-        val commitsList = commits.split("\n")
 
-        return commitsList.map { commit ->
-            // remove " -"
-            commit.drop(2).trim()
-        }.toImmutableList()
+        // Release notes are Markdown: show each list item as plain text, skip headings and blank lines
+        return commits.lines()
+            .map { it.trim() }
+            .filterNot { it.isEmpty() || it.startsWith("#") }
+            .map { line ->
+                line.removePrefix("- ")
+                    .removePrefix("* ")
+                    .replace(MarkdownLink) { it.groupValues[1] }
+                    .replace("**", "")
+                    .trim()
+            }
+            .filter { it.isNotEmpty() }
+            .toImmutableList()
     }
 
     companion object {
         private const val REDUNDANT_CHARS_COUNT = 10
+        private val MarkdownLink = Regex("""\[([^\]]+)]\([^)]+\)""")
     }
 
     fun toReleaseDate(date: String): String {

@@ -1,6 +1,7 @@
 # Ivy Wallet Plus
 
-[![APK](https://github.com/eyosias-k-negash/ivy-wallet-plus/actions/workflows/apk.yml/badge.svg)](https://github.com/eyosias-k-negash/ivy-wallet-plus/actions/workflows/apk.yml)
+[![CI](https://github.com/eyosias-k-negash/ivy-wallet-plus/actions/workflows/ci.yml/badge.svg)](https://github.com/eyosias-k-negash/ivy-wallet-plus/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/eyosias-k-negash/ivy-wallet-plus)](https://github.com/eyosias-k-negash/ivy-wallet-plus/releases/latest)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 > [!NOTE]
@@ -50,7 +51,13 @@ The app is called **[Ivy Wallet+](docs/User-Guide.md#ivy-wallet-name-and-logo)**
 
 ## Install
 
-There are no store releases or prebuilt downloads yet, so build the APK yourself. You need Java 17+ and the latest stable Android Studio.
+Download `ivy-wallet-plus-vX.Y.Z.apk` from the [latest release](https://github.com/eyosias-k-negash/ivy-wallet-plus/releases/latest), then open it on your phone to install. It isn't on the Play Store. New releases install over older ones and keep your data.
+
+Each release also has a `.sha256` file to check the download against.
+
+### Build it yourself
+
+You need Java 17+ and the latest stable Android Studio.
 
 ```bash
 git clone https://github.com/eyosias-k-negash/ivy-wallet-plus.git
@@ -58,7 +65,7 @@ cd ivy-wallet-plus
 ./gradlew assembleDemo
 ```
 
-The APK is written to `app/build/outputs/apk/demo/app-demo.apk`. Copy it to your phone and open it to install.
+The APK is written to `app/build/outputs/apk/demo/app-demo.apk`. Copy it to your phone and open it to install. It's a separate app from a downloaded release, so the two install side by side.
 
 For development, `./gradlew installDebug` installs **Ivy Wallet+ Debug**, which sits next to a regular install. Run `./gradlew testDebugUnitTest` for the unit tests.
 

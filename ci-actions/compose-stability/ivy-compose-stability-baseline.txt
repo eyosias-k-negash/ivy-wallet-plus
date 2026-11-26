@@ -110,3 +110,13 @@ com.ivy.reports.AccountsFilter
 com.ivy.reports.CategoriesFilter
 com.ivy.reports.AmountFilter
 com.ivy.reports.KeywordsFilter
+com.ivy.settings.title
+com.ivy.settings.formatFileSize
+com.ivy.wallet.ui.theme.modal.edit.amountOutcome
+com.ivy.wallet.ui.theme.modal.edit.fromMaster
+com.ivy.wallet.ui.theme.modal.edit.dateOutcome
+com.ivy.wallet.ui.theme.modal.edit.descriptionOutcome
+com.ivy.wallet.ui.theme.modal.edit.balanceOutcome
+com.ivy.wallet.ui.theme.modal.edit.feeOutcome
+com.ivy.wallet.ui.theme.modal.edit.monoStyle
+com.ivy.wallet.ui.theme.modal.edit.visibleText

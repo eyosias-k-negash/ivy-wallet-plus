@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+
+      - name: Build the debug APK
+        run: ./gradlew :app:assembleDebug
+
+      - name: Upload the debug APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: ivy-wallet-plus-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
+
+  unit_tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+
+      - name: Run unit tests
+        run: ./gradlew testDebugUnitTest :ci-actions:base:test :ci-actions:compose-stability:test
+
+      - name: Upload the test reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-test-reports
+          path: '**/build/reports/tests/'
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+
+      - name: Run Android Lint (release)
+        run: ./gradlew lintRelease
+
+      - name: Upload the Lint report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: lint-report
+          path: build/reports/lint/
+
+      # The Lint task itself never fails (abortOnError = false), so check the report for errors.
+      - name: Fail on Lint errors
+        run: |
+          if grep -q 'severity="Error"' build/reports/lint/lint.xml; then
+            echo "::error::Lint found errors. Download the lint-report artifact for details."
+            exit 1
+          fi
+
+  detekt:
+    name: Detekt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+
+      - name: Run Detekt
+        run: ./gradlew detekt
+
+      - name: Upload the Detekt report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: detekt-report
+          path: build/reports/detekt/detekt.html
+
+  screenshot_tests:
+    name: Screenshot tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+
+      - name: Verify Paparazzi screenshots
+        run: ./gradlew verifyPaparazziDebug
+
+      - name: Upload the screenshot diffs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: paparazzi-failures
+          path: '**/build/paparazzi/failures/'
+
+  compose_stability:
+    name: Compose stability
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+
+      # Compiling writes the Compose compiler reports that the check reads.
+      - name: Compile with Compose compiler reports
+        run: ./gradlew assembleDebug
+
+      - name: Check for new unstable composables
+        run: ./gradlew :ci-actions:compose-stability:run
+
+      - name: Upload the Compose stability report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: compose-stability-report
+          path: ci-actions/compose-stability/ivy-compose-stability-report.txt

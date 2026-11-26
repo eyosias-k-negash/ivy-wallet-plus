@@ -12,8 +12,8 @@ if [ ! -f "settings.gradle.kts" ]; then
 fi
 
 
-./gradlew detektBaseline || exit 0
-git add config/detekt/baseline.yml || exit 0
-git commit -m "Add Detekt baseline" || exit 0
+./gradlew detektBaseline || exit 1
+git add config/detekt/baseline.yml || exit 1
+git commit -m "Add Detekt baseline" || exit 1
 echo "Detekt baseline added."
 echo "[SUCCESS] Detekt baseline committed. Do 'git push'."

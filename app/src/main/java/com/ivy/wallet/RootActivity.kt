@@ -379,7 +379,7 @@ class RootActivity : AppCompatActivity(), RootScreen {
         val share = Intent.createChooser(
             Intent().apply {
                 action = Intent.ACTION_SEND
-                putExtra(Intent.EXTRA_TEXT, Constants.URL_IVY_WALLET_GOOGLE_PLAY)
+                putExtra(Intent.EXTRA_TEXT, Constants.URL_LATEST_RELEASE)
                 type = "text/plain"
             },
             null
