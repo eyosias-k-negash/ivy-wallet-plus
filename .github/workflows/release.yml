@@ -52,11 +52,14 @@ jobs:
           SIGNING_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: ./gradlew :app:assembleRelease
 
+      # Build-tools 37 labels the lines "V2 Signer: certificate SHA-256 digest:" instead of
+      # "Signer #1 certificate SHA-256 digest:", so match only the common part.
       - name: Check the signing certificate
         run: |
+          set -o pipefail
           apksigner="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -n 1)apksigner"
           cert=$("$apksigner" verify --print-certs app/build/outputs/apk/release/app-release.apk \
-            | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')
+            | grep -oE 'certificate SHA-256 digest: [0-9a-f]{64}' | awk '{ print $NF }' | sort -u)
           echo "Signing certificate SHA-256: $cert"
           if [ "$cert" != "$EXPECTED_CERT_SHA256" ]; then
             echo "::error::The APK is signed with an unexpected certificate ($cert). Check the signing secrets."
