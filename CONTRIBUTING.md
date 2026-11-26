@@ -60,10 +60,9 @@ The CI workflows run these on every pull request. Run the ones that cover your c
 
 To run one module's tests, prefix the task with the module, for example `./gradlew :temp:legacy-code:testDebugUnitTest`.
 
-> [!IMPORTANT]
-> Detekt already fails on `main`, mostly over fork code that isn't in the baseline. Don't let that hide new findings: search the report for the files you changed, and fix what you added. `scripts/detekt.sh` and `scripts/unitTests.sh` end in `|| exit 0`, so they always report success. Use the Gradle commands above instead.
+CI also builds the debug APK, checks Compose stability, tests the `ci-actions` modules and runs integration tests on an emulator. Every check passes on `main`, so a failure on your pull request comes from your change. [CI troubleshooting](docs/CI-Troubleshooting.md) explains each check and how to fix a failure.
 
-CI also builds the demo APK, checks Compose stability, tests the `ci-actions` modules and runs integration tests on an emulator. [CI troubleshooting](docs/CI-Troubleshooting.md) explains each check and how to fix a failure.
+To try a pull request without building it, download the `ivy-wallet-plus-debug-apk` artifact from its **CI** run.
 
 ## 5. Keep personal data out
 
