@@ -105,7 +105,7 @@ The Room database is `IvyRoomDatabase` in `shared/data/core`, at version 137. Ea
 `transactions.attachmentUrl` already existed upstream, so attachments needed no migration. [Contributing](../CONTRIBUTING.md#database-changes) has the checklist for adding a column.
 
 > [!WARNING]
-> The committed `130.json` was edited by the fork to include the location columns, so it no longer matches upstream's version 130. Don't edit committed schema files. Add a new version instead.
+> The committed `130.json` was edited by the fork to include the location columns, so it no longer matches upstream's version 130, and the 130 → 131 auto-migration is empty. `Migration129to130_LoanIncludeNote` adds the location columns too, so databases from older versions still migrate. Don't edit committed schema files. Add a new version instead.
 
 ## Notifications and background work
 
