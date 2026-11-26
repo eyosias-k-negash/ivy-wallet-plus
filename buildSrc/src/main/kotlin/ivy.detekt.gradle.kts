@@ -1,4 +1,5 @@
 import io.gitlab.arturbosch.detekt.Detekt
+import io.gitlab.arturbosch.detekt.DetektCreateBaselineTask
 import io.gitlab.arturbosch.detekt.extensions.DetektExtension
 
 plugins {
@@ -43,6 +44,15 @@ tasks.withType<Detekt> {
 
     // Target version of the generated JVM bytecode. It is used for type resolution.
     jvmTarget = catalog.version("jvm-target")
+}
+
+// Generate the baseline from the same files and rules that the detekt task checks
+tasks.withType<DetektCreateBaselineTask> {
+    include("**/*.kt", "**/*.kts")
+    exclude("**/resources/**", "**/build/**")
+    parallel.set(true)
+    buildUponDefaultConfig.set(true)
+    allRules.set(true)
 }
 
 dependencies {
